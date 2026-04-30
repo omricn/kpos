@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h4 class="mb-0 fw-semibold">
+    <i class="bi bi-building me-2 text-primary"></i>Distributors
+  </h4>
+  <a href="/admin/reports/distributor/add/" class="btn btn-kramer btn-sm" target="_blank">
+    <i class="bi bi-plus me-1"></i>Add Distributor
+  </a>
+</div>
+
+{% if distributors %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Code</th>
+          <th>Country</th>
+          <th>Records</th>
+          <th>Last Upload</th>
+          <th>Notes</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in distributors %}
+        <tr>
+          <td><strong>{{ d.name }}</strong></td>
+          <td><code>{{ d.code }}</code></td>
+          <td>{{ d.country|default:"—" }}</td>
+          <td>{{ d.record_count }}</td>
+          <td>
+            {% with u=d.latest_upload %}
+            {% if u %}{{ u.uploaded_at|date:"d M Y" }}{% else %}<span class="text-muted">Never</span>{% endif %}
+            {% endwith %}
+          </td>
+          <td class="text-muted small">{{ d.notes|default:"" }}</td>
+          <td>
+            <a href="{% url 'distributor_records' d.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-building display-4"></i>
+  <p class="mt-3">No distributors yet.</p>
+  <a href="/admin/reports/distributor/add/" class="btn btn-kramer btn-sm" target="_blank">Add First Distributor</a>
+</div>
+{% endif %}
+{% endblock %}

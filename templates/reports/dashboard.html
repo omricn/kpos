@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h4 class="mb-0 fw-semibold">
+    <i class="bi bi-speedometer2 me-2 text-primary"></i>Dashboard
+  </h4>
+  <a href="{% url 'upload' %}" class="btn btn-kramer btn-sm">
+    <i class="bi bi-cloud-upload me-1"></i>Upload New Report
+  </a>
+</div>
+
+{% if not dist_data %}
+<div class="text-center py-5">
+  <i class="bi bi-inbox display-1 text-muted"></i>
+  <p class="mt-3 text-muted">No distributors configured yet.</p>
+  <a href="/admin/reports/distributor/add/" class="btn btn-outline-secondary btn-sm mt-2">Add Distributor via Admin</a>
+</div>
+{% else %}
+
+<div class="row g-4">
+  {% for item in dist_data %}
+  {% with d=item.distributor s=item.stats u=item.latest_upload %}
+  <div class="col-xl-4 col-lg-6">
+    <div class="card h-100 shadow-sm border-0 dist-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+          <h5 class="mb-0 fw-semibold">{{ d.name }}</h5>
+          {% if d.country %}<span class="badge bg-secondary">{{ d.country }}</span>{% endif %}
+        </div>
+        <a href="{% url 'distributor_records' d.pk %}" class="btn btn-sm btn-kramer">
+          View <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <div class="card-body">
+
+        <!-- Stats row -->
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div class="stat-box">
+              <div class="stat-label">Records</div>
+              <div class="stat-value">{{ s.total_records|default:"0" }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="stat-box">
+              <div class="stat-label">Total Qty</div>
+              <div class="stat-value">{{ s.total_qty|default:"0" }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="stat-box">
+              <div class="stat-label">Total Value</div>
+              <div class="stat-value text-success">
+                {% if s.total_value %}
+                  {{ s.total_value|floatformat:0 }}
+                {% else %}—{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="stat-box">
+              <div class="stat-label">Period</div>
+              <div class="stat-value small">
+                {% if s.date_from and s.date_to %}
+                  {{ s.date_from|date:"d M" }} – {{ s.date_to|date:"d M Y" }}
+                {% else %}—{% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Last upload -->
+        {% if u %}
+        <div class="small text-muted border-top pt-2">
+          <i class="bi bi-clock me-1"></i>Last upload:
+          <strong>{{ u.uploaded_at|date:"d M Y H:i" }}</strong>
+          — {{ u.original_filename }}
+          {% if u.report_period %}<span class="badge bg-light text-dark ms-1">{{ u.report_period }}</span>{% endif %}
+        </div>
+        {% else %}
+        <div class="small text-muted border-top pt-2">
+          <i class="bi bi-exclamation-circle me-1"></i>No reports uploaded yet.
+          <a href="{% url 'upload' %}">Upload now →</a>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}

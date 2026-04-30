@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <nav aria-label="breadcrumb" class="mb-2">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Upload Report</li>
+      </ol>
+    </nav>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header">
+        <h5 class="mb-0 fw-semibold">
+          <i class="bi bi-cloud-upload me-2 text-primary"></i>Upload Distributor Report
+        </h5>
+      </div>
+      <div class="card-body p-4">
+
+        <div class="alert alert-info border-0 small mb-4">
+          <i class="bi bi-info-circle me-2"></i>
+          Upload an Excel (.xlsx) file received from a distributor. The file will be parsed automatically
+          using the format configured for that distributor.
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Distributor</label>
+            {{ form.distributor }}
+            {% if form.distributor.errors %}
+              <div class="text-danger small mt-1">{{ form.distributor.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Excel File</label>
+            {{ form.excel_file }}
+            {% if form.excel_file.errors %}
+              <div class="text-danger small mt-1">{{ form.excel_file.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Report Period <span class="text-muted fw-normal">(optional)</span></label>
+            {{ form.report_period }}
+            <div class="form-text">{{ form.report_period.help_text }}</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Notes <span class="text-muted fw-normal">(optional)</span></label>
+            {{ form.notes }}
+          </div>
+
+          <div class="mb-4">
+            <div class="form-check">
+              {{ form.replace_existing }}
+              <label class="form-check-label text-danger fw-semibold" for="{{ form.replace_existing.id_for_label }}">
+                {{ form.replace_existing.label }}
+              </label>
+              <div class="form-text text-danger">
+                ⚠ This will delete ALL existing records for the selected distributor before importing.
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-kramer px-4">
+              <i class="bi bi-upload me-2"></i>Import Records
+            </button>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- Supported formats -->
+    <div class="card border-0 shadow-sm mt-4">
+      <div class="card-header">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-file-earmark-excel me-2"></i>Supported Distributors & Formats</h6>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Distributor</th>
+              <th>Code</th>
+              <th>Format Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CDEV</td>
+              <td><code>cdev</code></td>
+              <td><span class="badge bg-success">Supported</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="p-3 text-muted small">
+          <i class="bi bi-plus-circle me-1"></i>
+          Additional distributors can be added once their Excel format is mapped.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
