@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/app
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn pos_project.wsgi:application --bind 0.0.0.0:8001 --workers 2"
