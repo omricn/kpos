@@ -210,6 +210,53 @@ body {
 .kpi-countries .kpi-icon-wrap { color: #F59E0B; }
 .kpi-countries { border-top: 3px solid #F59E0B; }
 
+/* ── Dashboard filter bar ── */
+.filter-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #888;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+.filter-input {
+  font-size: 0.9rem;
+  border-radius: 8px;
+  border: 1.5px solid #e0d0f0;
+  background: #fdfbff;
+  color: #1a1a2e;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.filter-input:focus {
+  border-color: var(--kramer-purple);
+  box-shadow: 0 0 0 3px rgba(130,5,180,0.12);
+  background: #fff;
+}
+.date-range-wrap {
+  position: relative;
+}
+.date-range-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--kramer-purple);
+  font-size: 1rem;
+  pointer-events: none;
+  z-index: 2;
+}
+.date-range-input {
+  padding-left: 2.2rem;
+  min-width: 220px;
+  cursor: pointer;
+}
+.filter-btn {
+  height: 38px;
+  font-size: 0.88rem;
+  border-radius: 8px;
+}
+
 /* ── Region cards (distributor list) ── */
 .region-card {
   border-radius: 14px;

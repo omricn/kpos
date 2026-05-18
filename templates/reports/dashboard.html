@@ -21,40 +21,55 @@
 
 <!-- Filter bar -->
 <div class="card border-0 shadow-sm mb-4">
-  <div class="card-body py-3">
-    <form class="row g-2 align-items-end" method="get">
-      <div class="col-auto">
-        <label class="form-label small fw-semibold text-muted mb-1">From</label>
-        <input type="date" class="form-control form-control-sm" name="date_from" value="{{ filters.date_from }}">
+  <div class="card-body py-4 px-4">
+    <form class="row g-3 align-items-end" method="get" id="filterForm">
+
+      <!-- Date range picker -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="dateRangePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="hiddenDateTo"   value="{{ filters.date_to }}">
+        </div>
       </div>
-      <div class="col-auto">
-        <label class="form-label small fw-semibold text-muted mb-1">To</label>
-        <input type="date" class="form-control form-control-sm" name="date_to" value="{{ filters.date_to }}">
-      </div>
-      <div class="col-auto">
-        <label class="form-label small fw-semibold text-muted mb-1">Region</label>
-        <select class="form-select form-select-sm" name="region" style="min-width:150px">
+
+      <!-- Region -->
+      <div class="col-6 col-xl-auto">
+        <label class="filter-label">Region</label>
+        <select class="form-select filter-input" name="region">
           <option value="">All Regions</option>
           {% for r in all_regions %}
           <option value="{{ r }}" {% if filters.region == r %}selected{% endif %}>{{ r }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-auto">
-        <label class="form-label small fw-semibold text-muted mb-1">Distributor</label>
-        <select class="form-select form-select-sm" name="distributor" style="min-width:180px">
+
+      <!-- Distributor -->
+      <div class="col-6 col-xl-auto">
+        <label class="filter-label">Distributor</label>
+        <select class="form-select filter-input" name="distributor" style="min-width:200px">
           <option value="">All Distributors</option>
           {% for d in all_distributors %}
           <option value="{{ d.pk }}" {% if filters.distributor == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-auto d-flex gap-2 align-items-center" style="padding-top:1.4rem">
-        <button class="btn btn-kramer btn-sm px-3" type="submit">Apply</button>
+
+      <!-- Actions -->
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
         {% if has_filters %}
-        <a class="btn btn-outline-secondary btn-sm" href="{% url 'dashboard' %}">Clear</a>
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'dashboard' %}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
         {% endif %}
       </div>
+
     </form>
   </div>
 </div>
@@ -162,7 +177,26 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Flatpickr date range picker
+(function() {
+  const hiddenFrom = document.getElementById('hiddenDateFrom').value;
+  const hiddenTo   = document.getElementById('hiddenDateTo').value;
+  const fp = flatpickr('#dateRangePicker', {
+    mode: 'range',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    onChange: function(selectedDates) {
+      document.getElementById('hiddenDateFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
+      document.getElementById('hiddenDateTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    }
+  });
+  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+})();
+</script>
 <script>
 const rawData = {{ chart_data|safe }};
 
