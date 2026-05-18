@@ -1,8 +1,11 @@
 import csv
+import json
 import openpyxl
+from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum, Count, Min, Max, Q
+from django.db.models.functions import TruncMonth
 from django.http import HttpResponse
 from django.utils import timezone
 
@@ -10,28 +13,106 @@ from .models import Distributor, POSUpload, POSRecord
 from .forms import UploadForm
 from .parsers import get_parser
 
+DIST_COLORS = [
+    '#8205B4', '#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#6366F1',
+    '#EC4899', '#14B8A6', '#F97316', '#84CC16',
+]
+
 
 def dashboard(request):
-    distributors = Distributor.objects.all()
-    dist_data = []
-    for d in distributors:
-        latest = d.uploads.order_by('-uploaded_at').first()
-        stats = d.records.aggregate(
-            total_records=Count('id'),
-            total_qty=Sum('quantity'),
-            total_value=Sum('invoiced_value'),
-            date_from=Min('invoice_date'),
-            date_to=Max('invoice_date'),
-        )
-        dist_data.append({
-            'distributor': d,
-            'latest_upload': latest,
-            'stats': stats,
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    region = request.GET.get('region', '')
+    distributor_id = request.GET.get('distributor', '')
+
+    qs = POSRecord.objects.select_related('distributor')
+    if date_from:
+        qs = qs.filter(invoice_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(invoice_date__lte=date_to)
+    if region:
+        qs = qs.filter(distributor__region=region)
+    if distributor_id:
+        qs = qs.filter(distributor_id=distributor_id)
+
+    totals = qs.aggregate(
+        total_revenue=Sum('invoiced_value'),
+        total_units=Sum('quantity'),
+        unique_countries=Count('country', distinct=True),
+    )
+    active_distributors = qs.values('distributor').distinct().count()
+
+    # Monthly revenue per distributor for chart
+    monthly_qs = list(
+        qs.filter(invoice_date__isnull=False, invoiced_value__isnull=False)
+        .annotate(month=TruncMonth('invoice_date'))
+        .values('month', 'distributor__id', 'distributor__name', 'distributor__code')
+        .annotate(revenue=Sum('invoiced_value'))
+        .order_by('month', 'distributor__name')
+    )
+
+    months_sorted = sorted(set(r['month'] for r in monthly_qs))
+    month_labels = [m.strftime('%b %Y') for m in months_sorted]
+    month_keys = [m.strftime('%Y-%m') for m in months_sorted]
+
+    # Build per-distributor dataset
+    dist_order = {}
+    for r in monthly_qs:
+        did = r['distributor__id']
+        if did not in dist_order:
+            dist_order[did] = {
+                'name': r['distributor__name'],
+                'by_month': {},
+            }
+        mk = r['month'].strftime('%Y-%m')
+        dist_order[did]['by_month'][mk] = float(r['revenue'])
+
+    datasets = []
+    for idx, (did, info) in enumerate(dist_order.items()):
+        color = DIST_COLORS[idx % len(DIST_COLORS)]
+        datasets.append({
+            'label': info['name'],
+            'data': [info['by_month'].get(mk, 0) for mk in month_keys],
+            'backgroundColor': color,
+            'borderColor': color,
+            'borderWidth': 0,
+            'borderRadius': 4,
         })
 
+    chart_data = json.dumps({'labels': month_labels, 'datasets': datasets})
+
+    # Per-distributor summary table
+    dist_summary = list(
+        qs.values('distributor__id', 'distributor__name', 'distributor__region', 'distributor__code')
+        .annotate(
+            revenue=Sum('invoiced_value'),
+            units=Sum('quantity'),
+            countries=Count('country', distinct=True),
+            records=Count('id'),
+        )
+        .order_by('-revenue')
+    )
+
+    all_regions = Distributor.objects.exclude(region='').values_list('region', flat=True).distinct().order_by('region')
+    all_distributors = Distributor.objects.all().order_by('name')
+
     context = {
-        'dist_data': dist_data,
-        'page_title': 'Dashboard',
+        'total_revenue': float(totals['total_revenue'] or 0),
+        'total_units': totals['total_units'] or 0,
+        'active_distributors': active_distributors,
+        'unique_countries': totals['unique_countries'] or 0,
+        'chart_data': chart_data,
+        'dist_summary': dist_summary,
+        'all_regions': all_regions,
+        'all_distributors': all_distributors,
+        'filters': {
+            'date_from': date_from,
+            'date_to': date_to,
+            'region': region,
+            'distributor': distributor_id,
+        },
+        'page_title': 'Revenue Dashboard',
+        'has_filters': any([date_from, date_to, region, distributor_id]),
     }
     return render(request, 'reports/dashboard.html', context)
 
@@ -114,8 +195,7 @@ def upload_file(request):
 
             try:
                 wb = openpyxl.load_workbook(excel_file, data_only=True)
-                ws = wb.active
-                parsed_rows = parser(ws)
+                parsed_rows = parser(wb)
             except Exception as e:
                 messages.error(request, f'Failed to parse Excel file: {e}')
                 return render(request, 'reports/upload.html', {'form': form, 'page_title': 'Upload Report'})

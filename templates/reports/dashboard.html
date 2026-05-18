@@ -1,97 +1,224 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block content %}
+
+<!-- Page header -->
 <div class="d-flex align-items-center justify-content-between mb-4">
-  <h4 class="mb-0 fw-semibold">
-    <i class="bi bi-speedometer2 me-2 text-primary"></i>Dashboard
-  </h4>
-  <a href="{% url 'upload' %}" class="btn btn-kramer btn-sm">
-    <i class="bi bi-cloud-upload me-1"></i>Upload New Report
-  </a>
+  <div>
+    <h4 class="mb-0 fw-bold" style="color:#1a1a2e">Revenue Overview</h4>
+    <p class="text-muted small mb-0">Global distributor sell-through — all figures in USD</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'distributor_list' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-table me-1"></i>Browse Data
+    </a>
+    <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
+      <i class="bi bi-cloud-upload me-1"></i>Upload
+    </a>
+  </div>
 </div>
 
-{% if not dist_data %}
-<div class="text-center py-5">
-  <i class="bi bi-inbox display-1 text-muted"></i>
-  <p class="mt-3 text-muted">No distributors configured yet.</p>
-  <a href="/admin/reports/distributor/add/" class="btn btn-outline-secondary btn-sm mt-2">Add Distributor via Admin</a>
-</div>
-{% else %}
-
-<div class="row g-4">
-  {% for item in dist_data %}
-  {% with d=item.distributor s=item.stats u=item.latest_upload %}
-  <div class="col-xl-4 col-lg-6">
-    <div class="card h-100 shadow-sm border-0 dist-card">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <div>
-          <h5 class="mb-0 fw-semibold">{{ d.name }}</h5>
-          {% if d.country %}<span class="badge bg-secondary">{{ d.country }}</span>{% endif %}
-        </div>
-        <a href="{% url 'distributor_records' d.pk %}" class="btn btn-sm btn-kramer">
-          View <i class="bi bi-arrow-right ms-1"></i>
-        </a>
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form class="row g-2 align-items-end" method="get">
+      <div class="col-auto">
+        <label class="form-label small fw-semibold text-muted mb-1">From</label>
+        <input type="date" class="form-control form-control-sm" name="date_from" value="{{ filters.date_from }}">
       </div>
-      <div class="card-body">
-
-        <!-- Stats row -->
-        <div class="row g-2 mb-3">
-          <div class="col-6">
-            <div class="stat-box">
-              <div class="stat-label">Records</div>
-              <div class="stat-value">{{ s.total_records|default:"0" }}</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="stat-box">
-              <div class="stat-label">Total Qty</div>
-              <div class="stat-value">{{ s.total_qty|default:"0" }}</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="stat-box">
-              <div class="stat-label">Total Value</div>
-              <div class="stat-value text-success">
-                {% if s.total_value %}
-                  {{ s.total_value|floatformat:0 }}
-                {% else %}—{% endif %}
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="stat-box">
-              <div class="stat-label">Period</div>
-              <div class="stat-value small">
-                {% if s.date_from and s.date_to %}
-                  {{ s.date_from|date:"d M" }} – {{ s.date_to|date:"d M Y" }}
-                {% else %}—{% endif %}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Last upload -->
-        {% if u %}
-        <div class="small text-muted border-top pt-2">
-          <i class="bi bi-clock me-1"></i>Last upload:
-          <strong>{{ u.uploaded_at|date:"d M Y H:i" }}</strong>
-          — {{ u.original_filename }}
-          {% if u.report_period %}<span class="badge bg-light text-dark ms-1">{{ u.report_period }}</span>{% endif %}
-        </div>
-        {% else %}
-        <div class="small text-muted border-top pt-2">
-          <i class="bi bi-exclamation-circle me-1"></i>No reports uploaded yet.
-          <a href="{% url 'upload' %}">Upload now →</a>
-        </div>
+      <div class="col-auto">
+        <label class="form-label small fw-semibold text-muted mb-1">To</label>
+        <input type="date" class="form-control form-control-sm" name="date_to" value="{{ filters.date_to }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-semibold text-muted mb-1">Region</label>
+        <select class="form-select form-select-sm" name="region" style="min-width:150px">
+          <option value="">All Regions</option>
+          {% for r in all_regions %}
+          <option value="{{ r }}" {% if filters.region == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-semibold text-muted mb-1">Distributor</label>
+        <select class="form-select form-select-sm" name="distributor" style="min-width:180px">
+          <option value="">All Distributors</option>
+          {% for d in all_distributors %}
+          <option value="{{ d.pk }}" {% if filters.distributor == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2 align-items-center" style="padding-top:1.4rem">
+        <button class="btn btn-kramer btn-sm px-3" type="submit">Apply</button>
+        {% if has_filters %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'dashboard' %}">Clear</a>
         {% endif %}
-
       </div>
+    </form>
+  </div>
+</div>
+
+<!-- KPI cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card kpi-revenue">
+      <div class="kpi-icon-wrap"><i class="bi bi-currency-dollar"></i></div>
+      <div class="kpi-amount">${{ total_revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-label">Total Revenue</div>
     </div>
   </div>
-  {% endwith %}
-  {% endfor %}
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card kpi-units">
+      <div class="kpi-icon-wrap"><i class="bi bi-box-seam"></i></div>
+      <div class="kpi-amount">{{ total_units|intcomma }}</div>
+      <div class="kpi-label">Units Sold</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card kpi-dist">
+      <div class="kpi-icon-wrap"><i class="bi bi-building"></i></div>
+      <div class="kpi-amount">{{ active_distributors }}</div>
+      <div class="kpi-label">Distributors</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card kpi-countries">
+      <div class="kpi-icon-wrap"><i class="bi bi-globe2"></i></div>
+      <div class="kpi-amount">{{ unique_countries }}</div>
+      <div class="kpi-label">Countries</div>
+    </div>
+  </div>
 </div>
 
+<!-- Revenue chart -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="mb-0 fw-bold" style="color:#1a1a2e">Revenue by Month</h6>
+      <div class="btn-group btn-group-sm" id="chartTypeToggle">
+        <button class="btn btn-outline-secondary active" data-type="bar">Bar</button>
+        <button class="btn btn-outline-secondary" data-type="line">Line</button>
+      </div>
+    </div>
+    <div style="position:relative;height:340px">
+      <canvas id="revenueChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Distributor breakdown table -->
+{% if dist_summary %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
+    <h6 class="mb-0 fw-bold" style="color:#1a1a2e">Breakdown by Distributor</h6>
+    <span class="text-muted small">Click a distributor to browse its records</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr style="background:#fafafa">
+          <th class="ps-4 text-uppercase small text-muted fw-semibold py-3" style="letter-spacing:.05em">Distributor</th>
+          <th class="text-uppercase small text-muted fw-semibold">Region</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue (USD)</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Countries</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Records</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in dist_summary %}
+        <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_records' d.distributor__id %}'">
+          <td class="ps-4 fw-semibold" style="color:#1a1a2e">
+            <i class="bi bi-arrow-right-circle me-2" style="color:var(--kramer-purple)"></i>
+            {{ d.distributor__name }}
+          </td>
+          <td><span class="badge rounded-pill" style="background:#f0eafc;color:var(--kramer-purple);font-weight:600">{{ d.distributor__region|default:"—" }}</span></td>
+          <td class="text-end fw-bold" style="color:#16a34a;font-size:1rem">${{ d.revenue|floatformat:0|intcomma }}</td>
+          <td class="text-end text-muted">{{ d.units|intcomma }}</td>
+          <td class="text-end text-muted">{{ d.countries }}</td>
+          <td class="text-end text-muted pe-4">{{ d.records|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+  <i class="bi bi-inbox display-1 text-muted"></i>
+  <p class="mt-3 text-muted">No data found for the selected filters.</p>
+</div>
 {% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const rawData = {{ chart_data|safe }};
+
+function fmtMoney(v) {
+  if (v >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+  return '$' + Math.round(v).toLocaleString();
+}
+
+const ctx = document.getElementById('revenueChart').getContext('2d');
+let currentType = 'bar';
+
+const chartConfig = {
+  type: 'bar',
+  data: rawData,
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { usePointStyle: true, padding: 20, font: { size: 12 } }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${fmtMoney(ctx.raw || 0)}`,
+          footer: items => ' Total: ' + fmtMoney(items.reduce((s, i) => s + (i.raw || 0), 0))
+        }
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        grid: { display: false },
+        ticks: { font: { size: 12 }, color: '#666' }
+      },
+      y: {
+        stacked: true,
+        grid: { color: '#f0f0f0' },
+        ticks: {
+          font: { size: 11 },
+          color: '#666',
+          callback: v => fmtMoney(v)
+        }
+      }
+    }
+  }
+};
+
+const chart = new Chart(ctx, chartConfig);
+
+// Bar / Line toggle
+document.querySelectorAll('#chartTypeToggle button').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#chartTypeToggle button').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const type = this.dataset.type;
+    chart.config.type = type;
+    const stacked = type === 'bar';
+    chart.options.scales.x.stacked = stacked;
+    chart.options.scales.y.stacked = stacked;
+    chart.update();
+  });
+});
+</script>
 {% endblock %}

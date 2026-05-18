@@ -5,6 +5,7 @@ class Distributor(models.Model):
     name = models.CharField(max_length=200)
     code = models.SlugField(max_length=50, unique=True)
     country = models.CharField(max_length=100, blank=True)
+    region = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -68,7 +69,7 @@ class POSRecord(models.Model):
     address_street = models.CharField(max_length=300, blank=True)
     address_city = models.CharField(max_length=100, blank=True)
     address_county = models.CharField(max_length=100, blank=True)
-    country = models.CharField(max_length=10, blank=True)
+    country = models.CharField(max_length=100, blank=True)
     post_code = models.CharField(max_length=20, blank=True)
     telephone = models.CharField(max_length=50, blank=True)
 

@@ -165,3 +165,46 @@ body {
 .form-label.fw-semibold {
   color: #444;
 }
+
+/* ── KPI Cards (dashboard) ── */
+.kpi-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 1.5rem 1.25rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+.kpi-icon-wrap {
+  font-size: 1.6rem;
+  margin-bottom: 0.75rem;
+  line-height: 1;
+}
+.kpi-amount {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #1a1a2e;
+  margin-bottom: 0.25rem;
+}
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #888;
+}
+.kpi-revenue .kpi-icon-wrap { color: #16a34a; }
+.kpi-revenue { border-top: 3px solid #16a34a; }
+.kpi-units .kpi-icon-wrap { color: #0EA5E9; }
+.kpi-units { border-top: 3px solid #0EA5E9; }
+.kpi-dist .kpi-icon-wrap { color: var(--kramer-purple); }
+.kpi-dist { border-top: 3px solid var(--kramer-purple); }
+.kpi-countries .kpi-icon-wrap { color: #F59E0B; }
+.kpi-countries { border-top: 3px solid #F59E0B; }

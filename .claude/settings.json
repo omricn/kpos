@@ -5,7 +5,19 @@
       "Bash(git -C /c/Users/ocohen/kdesk remote -v)",
       "Bash(gh auth *)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git config *)",
+      "Bash(git commit -m ' *)",
+      "Bash(docker compose *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(python -c ' *)",
+      "Bash(python)",
+      "Bash(ls /mnt/c/Users/ocohen/pos/reports/)",
+      "Read(//mnt/c/Users/ocohen/pos/**)",
+      "Bash(python manage.py import_pos_files)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(python manage.py shell -c ' *)"
     ]
   }
 }
