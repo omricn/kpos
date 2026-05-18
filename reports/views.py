@@ -42,42 +42,37 @@ def dashboard(request):
     )
     active_distributors = qs.values('distributor').distinct().count()
 
-    # Monthly revenue per distributor for chart
+    # Monthly revenue by region for chart
     monthly_qs = list(
         qs.filter(invoice_date__isnull=False, invoiced_value__isnull=False)
         .annotate(month=TruncMonth('invoice_date'))
-        .values('month', 'distributor__id', 'distributor__name', 'distributor__code')
+        .values('month', 'distributor__region')
         .annotate(revenue=Sum('invoiced_value'))
-        .order_by('month', 'distributor__name')
+        .order_by('month', 'distributor__region')
     )
 
     months_sorted = sorted(set(r['month'] for r in monthly_qs))
     month_labels = [m.strftime('%b %Y') for m in months_sorted]
     month_keys = [m.strftime('%Y-%m') for m in months_sorted]
 
-    # Build per-distributor dataset
-    dist_order = {}
+    region_order = {}
     for r in monthly_qs:
-        did = r['distributor__id']
-        if did not in dist_order:
-            dist_order[did] = {
-                'name': r['distributor__name'],
-                'by_month': {},
-            }
-        mk = r['month'].strftime('%Y-%m')
-        dist_order[did]['by_month'][mk] = float(r['revenue'])
+        reg = r['distributor__region'] or 'Unknown'
+        if reg not in region_order:
+            region_order[reg] = {'by_month': {}}
+        region_order[reg]['by_month'][r['month'].strftime('%Y-%m')] = float(r['revenue'])
 
     datasets = []
-    for idx, (did, info) in enumerate(dist_order.items()):
-        color = DIST_COLORS[idx % len(DIST_COLORS)]
+    for reg, info in region_order.items():
+        color = REGION_COLORS.get(reg, '#6c757d')
         datasets.append({
-            'label': info['name'],
+            'label': reg,
             'data': [info['by_month'].get(mk, 0) for mk in month_keys],
             'backgroundColor': color,
             'borderColor': color,
             'borderWidth': 0,
             'borderRadius': 4,
-            'distId': did,
+            'region': reg,
         })
 
     chart_data = json.dumps({'labels': month_labels, 'datasets': datasets})

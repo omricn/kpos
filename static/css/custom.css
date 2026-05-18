@@ -180,6 +180,7 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(0,0,0,0.12);
 }
+.kpi-clickable { cursor: pointer; }
 .kpi-icon-wrap {
   font-size: 1.6rem;
   margin-bottom: 0.75rem;

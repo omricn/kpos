@@ -62,32 +62,40 @@
 <!-- KPI cards -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-xl-3">
-    <div class="kpi-card kpi-revenue">
-      <div class="kpi-icon-wrap"><i class="bi bi-currency-dollar"></i></div>
-      <div class="kpi-amount">${{ total_revenue|floatformat:0|intcomma }}</div>
-      <div class="kpi-label">Total Revenue</div>
-    </div>
+    <a href="{% url 'distributor_list' %}" class="text-decoration-none">
+      <div class="kpi-card kpi-revenue kpi-clickable">
+        <div class="kpi-icon-wrap"><i class="bi bi-currency-dollar"></i></div>
+        <div class="kpi-amount">${{ total_revenue|floatformat:0|intcomma }}</div>
+        <div class="kpi-label">Total Revenue</div>
+      </div>
+    </a>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="kpi-card kpi-units">
-      <div class="kpi-icon-wrap"><i class="bi bi-box-seam"></i></div>
-      <div class="kpi-amount">{{ total_units|intcomma }}</div>
-      <div class="kpi-label">Units Sold</div>
-    </div>
+    <a href="{% url 'distributor_list' %}" class="text-decoration-none">
+      <div class="kpi-card kpi-units kpi-clickable">
+        <div class="kpi-icon-wrap"><i class="bi bi-box-seam"></i></div>
+        <div class="kpi-amount">{{ total_units|intcomma }}</div>
+        <div class="kpi-label">Units Sold</div>
+      </div>
+    </a>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="kpi-card kpi-dist">
-      <div class="kpi-icon-wrap"><i class="bi bi-building"></i></div>
-      <div class="kpi-amount">{{ active_distributors }}</div>
-      <div class="kpi-label">Distributors</div>
-    </div>
+    <a href="{% url 'distributor_list' %}" class="text-decoration-none">
+      <div class="kpi-card kpi-dist kpi-clickable">
+        <div class="kpi-icon-wrap"><i class="bi bi-building"></i></div>
+        <div class="kpi-amount">{{ active_distributors }}</div>
+        <div class="kpi-label">Distributors</div>
+      </div>
+    </a>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="kpi-card kpi-countries">
-      <div class="kpi-icon-wrap"><i class="bi bi-globe2"></i></div>
-      <div class="kpi-amount">{{ unique_countries }}</div>
-      <div class="kpi-label">Countries</div>
-    </div>
+    <a href="{% url 'distributor_list' %}" class="text-decoration-none">
+      <div class="kpi-card kpi-countries kpi-clickable">
+        <div class="kpi-icon-wrap"><i class="bi bi-globe2"></i></div>
+        <div class="kpi-amount">{{ unique_countries }}</div>
+        <div class="kpi-label">Countries</div>
+      </div>
+    </a>
   </div>
 </div>
 
@@ -177,7 +185,7 @@ const chartConfig = {
     onClick: (evt, elements) => {
       if (!elements.length) return;
       const ds = rawData.datasets[elements[0].datasetIndex];
-      if (ds && ds.distId) window.location.href = `/distributor/${ds.distId}/`;
+      if (ds && ds.region) window.location.href = `/distributors/?region=${encodeURIComponent(ds.region)}`;
     },
     onHover: (evt, elements) => {
       evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
@@ -188,9 +196,9 @@ const chartConfig = {
         labels: { usePointStyle: true, padding: 20, font: { size: 12 } },
         onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
         onLeave: (evt) => { evt.native.target.style.cursor = 'default'; },
-        onClick: (evt, item, legend) => {
+        onClick: (evt, item) => {
           const ds = rawData.datasets[item.datasetIndex];
-          if (ds && ds.distId) window.location.href = `/distributor/${ds.distId}/`;
+          if (ds && ds.region) window.location.href = `/distributors/?region=${encodeURIComponent(ds.region)}`;
         },
       },
       tooltip: {
