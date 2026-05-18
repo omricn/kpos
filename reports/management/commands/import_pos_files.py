@@ -20,11 +20,11 @@ def _find_pos_dir():
 POS_DIR = _find_pos_dir() or _CANDIDATE_DIRS[0]
 
 IMPORT_CONFIG = [
-    {'file': 'Q1_2026_POS_ASEAN.xlsx',         'region': 'ASEAN',          'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_GreaterChina.xlsx',   'region': 'Greater China',  'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_Northeast Asia.xlsx',  'region': 'Northeast Asia', 'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_Oceania.xlsx',         'region': 'Oceania',        'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_SAARC.xlsx',           'region': 'SAARC',          'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_ASEAN.xlsx',          'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_GreaterChina.xlsx',    'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_Northeast Asia.xlsx',  'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_Oceania.xlsx',         'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_SAARC.xlsx',           'region': 'APAC', 'period': 'Q1 2026'},
 ]
 
 # Codes that should not be touched by this command
@@ -54,7 +54,7 @@ class Command(BaseCommand):
         force = options['force']
 
         # Update CDEV region
-        Distributor.objects.filter(code='cdev').update(region='Europe')
+        Distributor.objects.filter(code='cdev').update(region='EMEA')
         self.stdout.write('  Updated CDEV region → Europe')
 
         # Remove old regional grouping distributors (not real companies)

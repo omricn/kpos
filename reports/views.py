@@ -279,12 +279,9 @@ def export_csv(request, pk):
 
 
 REGION_COLORS = {
-    'ASEAN':          '#10B981',
-    'Greater China':  '#0EA5E9',
-    'Northeast Asia': '#F59E0B',
-    'Oceania':        '#EF4444',
-    'SAARC':          '#6366F1',
-    'Europe':         '#8205B4',
+    'APAC':     '#0EA5E9',
+    'EMEA':     '#8205B4',
+    'Americas': '#10B981',
 }
 
 
