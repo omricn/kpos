@@ -68,14 +68,31 @@ def dashboard(request):
         datasets.append({
             'label': reg,
             'data': [info['by_month'].get(mk, 0) for mk in month_keys],
-            'backgroundColor': color,
+            'backgroundColor': color + 'aa',
             'borderColor': color,
-            'borderWidth': 0,
-            'borderRadius': 4,
+            'borderWidth': 2,
+            'fill': True,
+            'tension': 0.4,
+            'pointRadius': 3,
+            'pointHoverRadius': 6,
+            '_color': color,
             'region': reg,
         })
 
     chart_data = json.dumps({'labels': month_labels, 'datasets': datasets})
+
+    # Top 10 products by revenue
+    top_products = list(
+        qs.exclude(product_name='').exclude(product_name__isnull=True)
+        .values('product_name')
+        .annotate(revenue=Sum('invoiced_value'), units=Sum('quantity'))
+        .order_by('-revenue')[:10]
+    )
+    if top_products:
+        max_rev = float(max(p['revenue'] for p in top_products) or 1)
+        for p in top_products:
+            p['revenue'] = float(p['revenue'] or 0)
+            p['pct'] = round(p['revenue'] / max_rev * 100)
 
     # Per-distributor summary table
     dist_summary = list(
@@ -107,6 +124,7 @@ def dashboard(request):
             'region': region,
             'distributor': distributor_id,
         },
+        'top_products': top_products,
         'page_title': 'Revenue Dashboard',
         'has_filters': any([date_from, date_to, region, distributor_id]),
     }

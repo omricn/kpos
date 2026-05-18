@@ -10,12 +10,54 @@
     <p class="text-muted small mb-0">Global distributor sell-through — all figures in USD</p>
   </div>
   <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#topProductsPanel">
+      <i class="bi bi-trophy me-1"></i>Top Products
+    </button>
     <a href="{% url 'distributor_list' %}" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-table me-1"></i>Browse Data
     </a>
     <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
       <i class="bi bi-cloud-upload me-1"></i>Upload
     </a>
+  </div>
+</div>
+
+<!-- Top Products slide panel -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="topProductsPanel" style="width:420px;max-width:100vw">
+  <div class="offcanvas-header border-0 pb-2" style="background:linear-gradient(135deg,var(--kramer-purple) 0%,var(--kramer-purple-light) 100%)">
+    <div>
+      <h5 class="offcanvas-title mb-0 fw-bold text-white">
+        <i class="bi bi-trophy-fill me-2" style="color:#FCD34D"></i>Top 10 Products
+      </h5>
+      <p class="mb-0 small text-white-50">By revenue — matches current filters</p>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body p-0">
+    {% for p in top_products %}
+    <div class="product-rank-item px-4 py-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="product-rank-num {% if forloop.counter <= 3 %}top3{% endif %}">{{ forloop.counter }}</div>
+        <div class="flex-grow-1" style="min-width:0">
+          <div class="fw-semibold text-truncate" style="color:#1a1a2e;font-size:.88rem" title="{{ p.product_name }}">{{ p.product_name }}</div>
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <div class="product-rank-bar-track flex-grow-1">
+              <div class="product-rank-bar-fill" style="width:{{ p.pct }}%"></div>
+            </div>
+            <span class="text-muted" style="font-size:.75rem;white-space:nowrap">{{ p.units|intcomma }} units</span>
+          </div>
+        </div>
+        <div class="fw-bold" style="color:#16a34a;font-size:.92rem;white-space:nowrap">${{ p.revenue|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-inbox display-4 d-block mb-2"></i>No data available.
+    </div>
+    {% endfor %}
+    <div class="px-4 py-3 border-top" style="background:#fafafa">
+      <p class="text-muted small mb-0"><i class="bi bi-clock-history me-1"></i>More rankings coming soon — sales rep leaderboard</p>
+    </div>
   </div>
 </div>
 
@@ -120,8 +162,8 @@
     <div class="d-flex align-items-center justify-content-between mb-3">
       <h6 class="mb-0 fw-bold" style="color:#1a1a2e">Revenue by Month</h6>
       <div class="btn-group btn-group-sm" id="chartTypeToggle">
-        <button class="btn btn-outline-secondary active" data-type="bar">Bar</button>
-        <button class="btn btn-outline-secondary" data-type="line">Line</button>
+        <button class="btn btn-outline-secondary active" data-type="area"><i class="bi bi-activity me-1"></i>Wave</button>
+        <button class="btn btn-outline-secondary" data-type="bar"><i class="bi bi-bar-chart-fill me-1"></i>Bar</button>
       </div>
     </div>
     <div style="position:relative;height:340px">
@@ -207,10 +249,9 @@ function fmtMoney(v) {
 }
 
 const ctx = document.getElementById('revenueChart').getContext('2d');
-let currentType = 'bar';
 
 const chartConfig = {
-  type: 'bar',
+  type: 'line',
   data: rawData,
   options: {
     responsive: true,
@@ -263,16 +304,32 @@ const chartConfig = {
 
 const chart = new Chart(ctx, chartConfig);
 
-// Bar / Line toggle
+// Wave / Bar toggle
 document.querySelectorAll('#chartTypeToggle button').forEach(btn => {
   btn.addEventListener('click', function() {
     document.querySelectorAll('#chartTypeToggle button').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
-    const type = this.dataset.type;
-    chart.config.type = type;
-    const stacked = type === 'bar';
-    chart.options.scales.x.stacked = stacked;
-    chart.options.scales.y.stacked = stacked;
+    const isArea = this.dataset.type === 'area';
+    chart.config.type = isArea ? 'line' : 'bar';
+    chart.options.scales.x.stacked = true;
+    chart.options.scales.y.stacked = true;
+    chart.data.datasets.forEach(ds => {
+      if (isArea) {
+        ds.fill = true;
+        ds.tension = 0.4;
+        ds.pointRadius = 3;
+        ds.borderWidth = 2;
+        ds.backgroundColor = ds._color + 'aa';
+        ds.borderRadius = undefined;
+      } else {
+        ds.fill = false;
+        ds.tension = 0;
+        ds.pointRadius = 0;
+        ds.borderWidth = 0;
+        ds.backgroundColor = ds._color;
+        ds.borderRadius = 4;
+      }
+    });
     chart.update();
   });
 });
