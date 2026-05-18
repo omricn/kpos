@@ -174,10 +174,24 @@ const chartConfig = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
+    onClick: (evt, elements) => {
+      if (!elements.length) return;
+      const ds = rawData.datasets[elements[0].datasetIndex];
+      if (ds && ds.distId) window.location.href = `/distributor/${ds.distId}/`;
+    },
+    onHover: (evt, elements) => {
+      evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+    },
     plugins: {
       legend: {
         position: 'bottom',
-        labels: { usePointStyle: true, padding: 20, font: { size: 12 } }
+        labels: { usePointStyle: true, padding: 20, font: { size: 12 } },
+        onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
+        onLeave: (evt) => { evt.native.target.style.cursor = 'default'; },
+        onClick: (evt, item, legend) => {
+          const ds = rawData.datasets[item.datasetIndex];
+          if (ds && ds.distId) window.location.href = `/distributor/${ds.distId}/`;
+        },
       },
       tooltip: {
         callbacks: {

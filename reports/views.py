@@ -77,6 +77,7 @@ def dashboard(request):
             'borderColor': color,
             'borderWidth': 0,
             'borderRadius': 4,
+            'distId': did,
         })
 
     chart_data = json.dumps({'labels': month_labels, 'datasets': datasets})
