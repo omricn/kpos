@@ -45,9 +45,9 @@
   </div>
   <div class="col">
     <div class="stat-pill green">
-      <i class="bi bi-currency-euro"></i>
+      <i class="bi bi-currency-dollar"></i>
       <span class="label">Total Value</span>
-      <span class="value">{% if stats.total_value %}{{ stats.total_value|floatformat:2 }}{% else %}—{% endif %}</span>
+      <span class="value">{% if stats.total_value %}${{ stats.total_value|floatformat:2 }}{% else %}—{% endif %}</span>
     </div>
   </div>
   <div class="col">
@@ -147,9 +147,9 @@
               <strong>{{ r.customer_name|default:"—" }}</strong>
               {% if r.customer_account %}<br><span class="text-muted small">{{ r.customer_account }}</span>{% endif %}
             </td>
-            <td>{{ r.address_city|default:"—" }}</td>
+            <td>{{ r.address_city|default:r.country|default:"—" }}</td>
             <td>
-              <span title="{{ r.product_description }}">{{ r.product_name|default:"—" }}</span>
+              <span title="{{ r.product_description }}">{{ r.product_name|default:r.manufacturer_part_no|default:"—" }}</span>
               {% if r.brand and r.brand != 'Kramer Electronics' %}
                 <br><span class="badge bg-light text-dark small">{{ r.brand }}</span>
               {% endif %}
@@ -157,7 +157,7 @@
             <td>
               <span class="badge category-badge">{{ r.product_level_1|default:"—" }}</span>
             </td>
-            <td class="text-muted small">{{ r.item_number|default:"—" }}</td>
+            <td class="text-muted small">{{ r.manufacturer_part_no|default:r.item_number|default:"—" }}</td>
             <td class="text-center fw-bold">{{ r.quantity|default:"—" }}</td>
             <td class="text-end text-muted small">{% if r.sales_price %}{{ r.sales_price|floatformat:2 }}{% else %}—{% endif %}</td>
             <td class="text-end fw-semibold text-success">{% if r.invoiced_value %}{{ r.invoiced_value|floatformat:2 }}{% else %}—{% endif %}</td>

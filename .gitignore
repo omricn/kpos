@@ -23,3 +23,6 @@ env/
 
 # Logs
 *.log
+
+# POS source files (Excel data, not source code)
+pos_files/
