@@ -208,3 +208,24 @@ body {
 .kpi-dist { border-top: 3px solid var(--kramer-purple); }
 .kpi-countries .kpi-icon-wrap { color: #F59E0B; }
 .kpi-countries { border-top: 3px solid #F59E0B; }
+
+/* ── Region cards (distributor list) ── */
+.region-card {
+  border-radius: 14px;
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.region-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.13) !important;
+}
+.region-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}

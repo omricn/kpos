@@ -283,9 +283,58 @@ def export_csv(request, pk):
     return response
 
 
+REGION_COLORS = {
+    'ASEAN':          '#10B981',
+    'Greater China':  '#0EA5E9',
+    'Northeast Asia': '#F59E0B',
+    'Oceania':        '#EF4444',
+    'SAARC':          '#6366F1',
+    'Europe':         '#8205B4',
+}
+
+
 def distributor_list(request):
-    distributors = Distributor.objects.all()
+    selected_region = request.GET.get('region', '').strip()
+
+    all_distributors = Distributor.objects.all().order_by('name')
+
+    region_qs = (
+        POSRecord.objects
+        .values('distributor__region')
+        .annotate(
+            revenue=Sum('invoiced_value'),
+            records=Count('id'),
+            dist_count=Count('distributor', distinct=True),
+        )
+        .order_by('distributor__region')
+    )
+    region_stats = [
+        {
+            'name': r['distributor__region'] or 'Unknown',
+            'revenue': float(r['revenue'] or 0),
+            'records': r['records'] or 0,
+            'dist_count': r['dist_count'] or 0,
+            'color': REGION_COLORS.get(r['distributor__region'], '#6c757d'),
+        }
+        for r in region_qs
+    ]
+
+    filtered_distributors = None
+    if selected_region:
+        filtered_distributors = list(
+            Distributor.objects
+            .filter(region=selected_region)
+            .annotate(
+                total_records=Count('records'),
+                total_revenue=Sum('records__invoiced_value'),
+            )
+            .order_by('-total_revenue')
+        )
+
     return render(request, 'reports/distributor_list.html', {
-        'distributors': distributors,
+        'all_distributors': all_distributors,
+        'region_stats': region_stats,
+        'selected_region': selected_region,
+        'filtered_distributors': filtered_distributors,
         'page_title': 'Distributors',
     })

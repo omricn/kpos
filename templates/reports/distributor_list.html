@@ -1,58 +1,119 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block content %}
+
+<!-- Header -->
 <div class="d-flex align-items-center justify-content-between mb-4">
-  <h4 class="mb-0 fw-semibold">
-    <i class="bi bi-building me-2 text-primary"></i>Distributors
-  </h4>
-  <a href="/admin/reports/distributor/add/" class="btn btn-kramer btn-sm" target="_blank">
-    <i class="bi bi-plus me-1"></i>Add Distributor
-  </a>
+  <div>
+    <h4 class="mb-0 fw-bold" style="color:#1a1a2e">
+      {% if selected_region %}
+        <a href="{% url 'distributor_list' %}" class="text-decoration-none me-2" style="color:#aaa;font-size:.9rem">
+          <i class="bi bi-chevron-left"></i> Regions
+        </a>
+        {{ selected_region }}
+      {% else %}
+        Browse Data
+      {% endif %}
+    </h4>
+    <p class="text-muted small mb-0">
+      {% if selected_region %}Distributors in this region{% else %}Select a region or jump to a specific distributor{% endif %}
+    </p>
+  </div>
+
+  <!-- Quick-jump dropdown -->
+  <div class="d-flex align-items-center gap-2">
+    <select id="distJump" class="form-select form-select-sm" style="min-width:240px">
+      <option value="">Jump to distributor…</option>
+      {% for d in all_distributors %}
+      <option value="{% url 'distributor_records' d.pk %}">{{ d.name }}{% if d.region %} ({{ d.region }}){% endif %}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-kramer btn-sm" onclick="jumpToDist()">Go</button>
+  </div>
 </div>
 
-{% if distributors %}
+{% if not selected_region %}
+<!-- ── Region cards ────────────────────────────────────────────── -->
+<div class="row g-3">
+  {% for r in region_stats %}
+  <div class="col-md-4 col-xl-3">
+    <a href="?region={{ r.name|urlencode }}" class="text-decoration-none">
+      <div class="card border-0 shadow-sm h-100 region-card" style="border-top:4px solid {{ r.color }} !important">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="region-icon-wrap" style="background:{{ r.color }}1a;color:{{ r.color }}">
+              <i class="bi bi-globe2"></i>
+            </div>
+            <div>
+              <h6 class="mb-0 fw-bold" style="color:#1a1a2e">{{ r.name }}</h6>
+              <span class="text-muted small">{{ r.dist_count }} distributor{{ r.dist_count|pluralize }}</span>
+            </div>
+          </div>
+          <div class="d-flex justify-content-between align-items-end">
+            <div>
+              <div class="fw-bold fs-5" style="color:{{ r.color }}">${{ r.revenue|floatformat:0|intcomma }}</div>
+              <div class="text-muted small">{{ r.records|intcomma }} records</div>
+            </div>
+            <i class="bi bi-arrow-right-circle fs-4" style="color:{{ r.color }}"></i>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<!-- ── Distributor list for selected region ───────────────────── -->
+{% with color=region_color %}
 <div class="card border-0 shadow-sm">
   <div class="card-body p-0">
-    <table class="table table-hover mb-0">
-      <thead>
+    <table class="table table-hover mb-0 align-middle">
+      <thead style="background:#fafafa">
         <tr>
-          <th>Name</th>
-          <th>Code</th>
-          <th>Country</th>
-          <th>Records</th>
-          <th>Last Upload</th>
-          <th>Notes</th>
-          <th></th>
+          <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Distributor</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue (USD)</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Records</th>
+          <th class="pe-4"></th>
         </tr>
       </thead>
       <tbody>
-        {% for d in distributors %}
-        <tr>
-          <td><strong>{{ d.name }}</strong></td>
-          <td><code>{{ d.code }}</code></td>
-          <td>{{ d.country|default:"—" }}</td>
-          <td>{{ d.record_count }}</td>
-          <td>
-            {% with u=d.latest_upload %}
-            {% if u %}{{ u.uploaded_at|date:"d M Y" }}{% else %}<span class="text-muted">Never</span>{% endif %}
-            {% endwith %}
+        {% for d in filtered_distributors %}
+        <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_records' d.pk %}'">
+          <td class="ps-4 py-3">
+            <div class="fw-semibold" style="color:#1a1a2e">{{ d.name }}</div>
           </td>
-          <td class="text-muted small">{{ d.notes|default:"" }}</td>
-          <td>
-            <a href="{% url 'distributor_records' d.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+          <td class="text-end fw-bold" style="color:#16a34a">
+            {% if d.total_revenue %}${{ d.total_revenue|floatformat:0|intcomma }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-muted">{{ d.total_records|intcomma }}</td>
+          <td class="text-end pe-4">
+            <a href="{% url 'distributor_records' d.pk %}" class="btn btn-sm btn-kramer">
+              View <i class="bi bi-arrow-right ms-1"></i>
+            </a>
           </td>
         </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted py-4">No distributors found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
-{% else %}
-<div class="text-center py-5 text-muted">
-  <i class="bi bi-building display-4"></i>
-  <p class="mt-3">No distributors yet.</p>
-  <a href="/admin/reports/distributor/add/" class="btn btn-kramer btn-sm" target="_blank">Add First Distributor</a>
-</div>
+{% endwith %}
 {% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function jumpToDist() {
+  const sel = document.getElementById('distJump');
+  if (sel.value) window.location.href = sel.value;
+}
+document.getElementById('distJump').addEventListener('change', function() {
+  if (this.value) window.location.href = this.value;
+});
+</script>
 {% endblock %}
