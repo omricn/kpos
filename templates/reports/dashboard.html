@@ -6,7 +6,7 @@
 <!-- Page header -->
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
-    <h4 class="mb-0 fw-bold" style="color:#1a1a2e">Revenue Overview</h4>
+    <h4 class="mb-0 fw-bold">Revenue Overview</h4>
     <p class="text-muted small mb-0">Global distributor sell-through — all figures in USD</p>
   </div>
   <div class="d-flex gap-2">
@@ -160,7 +160,7 @@
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body p-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h6 class="mb-0 fw-bold" style="color:#1a1a2e">Revenue by Month</h6>
+      <h6 class="mb-0 fw-bold">Revenue by Month</h6>
       <div class="btn-group btn-group-sm" id="chartTypeToggle">
         <button class="btn btn-outline-secondary active" data-type="area"><i class="bi bi-activity me-1"></i>Wave</button>
         <button class="btn btn-outline-secondary" data-type="bar"><i class="bi bi-bar-chart-fill me-1"></i>Bar</button>
@@ -176,7 +176,7 @@
 {% if dist_summary %}
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
-    <h6 class="mb-0 fw-bold" style="color:#1a1a2e">Breakdown by Distributor</h6>
+    <h6 class="mb-0 fw-bold">Breakdown by Distributor</h6>
     <span class="text-muted small">Click a distributor to browse its records</span>
   </div>
   <div class="table-responsive">
@@ -194,12 +194,12 @@
       <tbody>
         {% for d in dist_summary %}
         <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_records' d.distributor__id %}'">
-          <td class="ps-4 fw-semibold" style="color:#1a1a2e">
+          <td class="ps-4 fw-semibold">
             <i class="bi bi-arrow-right-circle me-2" style="color:var(--kramer-purple)"></i>
             {{ d.distributor__name }}
           </td>
-          <td><span class="badge rounded-pill" style="background:#f0eafc;color:var(--kramer-purple);font-weight:600">{{ d.distributor__region|default:"—" }}</span></td>
-          <td class="text-end fw-bold" style="color:#16a34a;font-size:1rem">${{ d.revenue|floatformat:0|intcomma }}</td>
+          <td><span class="badge badge-region rounded-pill">{{ d.distributor__region|default:"—" }}</span></td>
+          <td class="text-end fw-bold text-revenue fs-6">${{ d.revenue|floatformat:0|intcomma }}</td>
           <td class="text-end text-muted">{{ d.units|intcomma }}</td>
           <td class="text-end text-muted">{{ d.countries }}</td>
           <td class="text-end text-muted pe-4">{{ d.records|intcomma }}</td>
@@ -303,6 +303,18 @@ const chartConfig = {
 };
 
 const chart = new Chart(ctx, chartConfig);
+
+function applyChartTheme() {
+  var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  var gridColor  = isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+  var tickColor  = isDark ? '#636366' : '#666';
+  chart.options.scales.x.ticks.color = tickColor;
+  chart.options.scales.y.ticks.color = tickColor;
+  chart.options.scales.y.grid.color  = gridColor;
+  chart.update('none');
+}
+applyChartTheme();
+window.onThemeChange = applyChartTheme;
 
 // Wave / Bar toggle
 document.querySelectorAll('#chartTypeToggle button').forEach(btn => {

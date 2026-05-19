@@ -6,7 +6,7 @@
 <!-- Header -->
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
-    <h4 class="mb-0 fw-bold" style="color:#1a1a2e">
+    <h4 class="mb-0 fw-bold" class="text-body">
       {% if selected_region %}
         <a href="{% url 'distributor_list' %}" class="text-decoration-none me-2" style="color:#aaa;font-size:.9rem">
           <i class="bi bi-chevron-left"></i> Regions
@@ -46,7 +46,7 @@
               <i class="bi bi-globe2"></i>
             </div>
             <div>
-              <h6 class="mb-0 fw-bold" style="color:#1a1a2e">{{ r.name }}</h6>
+              <h6 class="mb-0 fw-bold" class="text-body">{{ r.name }}</h6>
               <span class="text-muted small">{{ r.dist_count }} distributor{{ r.dist_count|pluralize }}</span>
             </div>
           </div>
@@ -82,9 +82,9 @@
         {% for d in filtered_distributors %}
         <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_records' d.pk %}'">
           <td class="ps-4 py-3">
-            <div class="fw-semibold" style="color:#1a1a2e">{{ d.name }}</div>
+            <div class="fw-semibold" class="text-body">{{ d.name }}</div>
           </td>
-          <td class="text-end fw-bold" style="color:#16a34a">
+          <td class="text-end fw-bold text-revenue">
             {% if d.total_revenue %}${{ d.total_revenue|floatformat:0|intcomma }}{% else %}—{% endif %}
           </td>
           <td class="text-end text-muted">{{ d.total_records|intcomma }}</td>
