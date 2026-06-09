@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Skill(gsd-scan)",
-      "Skill(gsd-scan:*)"
+      "Skill(gsd-scan:*)",
+      "Bash(cmd.exe /c \"dir \\\\\"C:\\\\Users\\\\ocohen\\\\OneDrive - Kramer Electronics Ltd\\\\POS Project\\\\\" /O-D /A-D\")",
+      "Bash(cmd.exe /c dir \"C:\\\\Users\\\\ocohen\\\\OneDrive - Kramer Electronics Ltd\\\\POS Project\" /O-D /A-D)",
+      "Bash(cmd.exe /c \"dir \\\\\"C:\\\\Users\\\\ocohen\\\\OneDrive - Kramer Electronics Ltd\\\\POS Project\\\\\" /O-D\")",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

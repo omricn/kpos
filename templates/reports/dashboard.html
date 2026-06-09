@@ -66,6 +66,17 @@
   <div class="card-body py-4 px-4">
     <form class="row g-3 align-items-end" method="get" id="filterForm">
 
+      <!-- Period presets -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Period</label>
+        <div class="btn-group btn-group-sm" id="periodPresets">
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn {% if not filters.date_from and not filters.date_to %}active{% endif %}" data-period="all">All</button>
+        </div>
+      </div>
+
       <!-- Date range picker -->
       <div class="col-12 col-xl-auto">
         <label class="filter-label">Date Range</label>
@@ -117,7 +128,7 @@
 </div>
 
 <!-- KPI cards -->
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-3">
   <div class="col-6 col-xl-3">
     <a href="{% url 'distributor_list' %}" class="text-decoration-none">
       <div class="kpi-card kpi-revenue kpi-clickable">
@@ -156,14 +167,30 @@
   </div>
 </div>
 
+<!-- Region strip -->
+{% if region_cards %}
+<div class="region-strip mb-4">
+  {% for rc in region_cards %}
+  <a href="{% url 'distributor_list' %}?region={{ rc.name|urlencode }}" class="region-strip-item text-decoration-none" style="border-left:3px solid {{ rc.color }}">
+    <i class="bi bi-globe2 me-1" style="color:{{ rc.color }}"></i>
+    <span class="fw-semibold me-2">{{ rc.name }}</span>
+    <span class="text-muted small me-2">{{ rc.dist_count }} dist.</span>
+    <span class="fw-bold me-1" style="color:{{ rc.color }}">{{ currency_symbol }}{{ rc.revenue|floatformat:0|intcomma }}</span>
+    <span class="text-muted small">{{ rc.pct }}%</span>
+    <i class="bi bi-chevron-right ms-auto small text-muted"></i>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- Revenue chart -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body p-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <h6 class="mb-0 fw-bold">Revenue by Month</h6>
       <div class="btn-group btn-group-sm" id="chartTypeToggle">
-        <button class="btn btn-outline-secondary active" data-type="area"><i class="bi bi-activity me-1"></i>Wave</button>
-        <button class="btn btn-outline-secondary" data-type="bar"><i class="bi bi-bar-chart-fill me-1"></i>Bar</button>
+        <button class="btn btn-outline-secondary" data-type="area"><i class="bi bi-activity me-1"></i>Wave</button>
+        <button class="btn btn-outline-secondary active" data-type="bar"><i class="bi bi-bar-chart-fill me-1"></i>Bar</button>
       </div>
     </div>
     <div style="position:relative;height:340px">
@@ -237,112 +264,117 @@
     }
   });
   if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+
+  // Period preset buttons
+  const today = new Date();
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const p = this.dataset.period;
+      let df = null, dt = null;
+      if (p === 'mtd') {
+        df = new Date(today.getFullYear(), today.getMonth(), 1);
+        dt = today;
+      } else if (p === 'qtd') {
+        const qStart = Math.floor(today.getMonth() / 3) * 3;
+        df = new Date(today.getFullYear(), qStart, 1);
+        dt = today;
+      } else if (p === 'ytd') {
+        df = new Date(today.getFullYear(), 0, 1);
+        dt = today;
+      }
+      if (df && dt) {
+        fp.setDate([df, dt]);
+        document.getElementById('hiddenDateFrom').value = fp.formatDate(df, 'Y-m-d');
+        document.getElementById('hiddenDateTo').value   = fp.formatDate(dt, 'Y-m-d');
+      } else {
+        fp.clear();
+        document.getElementById('hiddenDateFrom').value = '';
+        document.getElementById('hiddenDateTo').value   = '';
+      }
+      document.getElementById('filterForm').submit();
+    });
+  });
 })();
 </script>
 <script>
 const rawData = {{ chart_data|safe }};
+const currSym = '{{ currency_symbol }}';
 
 function fmtMoney(v) {
-  if (v >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
-  if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
-  return '$' + Math.round(v).toLocaleString();
+  if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
+  return currSym + Math.round(v).toLocaleString();
 }
 
-const ctx = document.getElementById('revenueChart').getContext('2d');
+let revenueChart = null;
 
-const chartConfig = {
-  type: 'line',
-  data: rawData,
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    onClick: (evt, elements) => {
-      if (!elements.length) return;
-      const ds = rawData.datasets[elements[0].datasetIndex];
-      if (ds && ds.region) window.location.href = `/distributors/?region=${encodeURIComponent(ds.region)}`;
-    },
-    onHover: (evt, elements) => {
-      evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-    },
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: { usePointStyle: true, padding: 20, font: { size: 12 } },
-        onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
-        onLeave: (evt) => { evt.native.target.style.cursor = 'default'; },
-        onClick: (evt, item) => {
-          const ds = rawData.datasets[item.datasetIndex];
-          if (ds && ds.region) window.location.href = `/distributors/?region=${encodeURIComponent(ds.region)}`;
+function buildRevenueChart(type) {
+  if (revenueChart) revenueChart.destroy();
+  const isArea = type === 'area';
+  rawData.datasets.forEach(ds => {
+    if (isArea) {
+      ds.fill = true; ds.tension = 0.4; ds.pointRadius = 3;
+      ds.borderWidth = 2; ds.backgroundColor = ds._color + 'aa';
+      ds.borderColor = ds._color; ds.borderRadius = undefined;
+    } else {
+      ds.fill = false; ds.tension = 0; ds.pointRadius = 0;
+      ds.borderWidth = 0; ds.backgroundColor = ds._color;
+      ds.borderColor = ds._color; ds.borderRadius = 4;
+    }
+  });
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+  const tickColor = isDark ? '#636366' : '#666';
+  revenueChart = new Chart(document.getElementById('revenueChart').getContext('2d'), {
+    type: isArea ? 'line' : 'bar',
+    data: rawData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const ds = rawData.datasets[elements[0].datasetIndex];
+        if (ds && ds.region) window.location.href = `/distributors/?region=${encodeURIComponent(ds.region)}`;
+      },
+      onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { usePointStyle: true, padding: 20, font: { size: 12 }, color: tickColor },
+          onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
+          onLeave: (evt) => { evt.native.target.style.cursor = 'default'; },
+          onClick: (evt, item) => {
+            const ds = rawData.datasets[item.datasetIndex];
+            if (ds && ds.region) window.location.href = `/distributors/?region=${encodeURIComponent(ds.region)}`;
+          },
         },
-      },
-      tooltip: {
-        callbacks: {
-          label: ctx => ` ${ctx.dataset.label}: ${fmtMoney(ctx.raw || 0)}`,
-          footer: items => ' Total: ' + fmtMoney(items.reduce((s, i) => s + (i.raw || 0), 0))
+        tooltip: {
+          callbacks: {
+            label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw || 0)}`,
+            footer: items => ' Total: ' + fmtMoney(items.reduce((s, i) => s + (i.raw || 0), 0))
+          }
         }
-      }
-    },
-    scales: {
-      x: {
-        stacked: true,
-        grid: { display: false },
-        ticks: { font: { size: 12 }, color: '#666' }
       },
-      y: {
-        stacked: true,
-        grid: { color: '#f0f0f0' },
-        ticks: {
-          font: { size: 11 },
-          color: '#666',
-          callback: v => fmtMoney(v)
-        }
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 12 }, color: tickColor } },
+        y: { stacked: true, grid: { color: gridColor }, ticks: { font: { size: 11 }, color: tickColor, callback: v => fmtMoney(v) } }
       }
     }
-  }
-};
-
-const chart = new Chart(ctx, chartConfig);
-
-function applyChartTheme() {
-  var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-  var gridColor  = isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
-  var tickColor  = isDark ? '#636366' : '#666';
-  chart.options.scales.x.ticks.color = tickColor;
-  chart.options.scales.y.ticks.color = tickColor;
-  chart.options.scales.y.grid.color  = gridColor;
-  chart.update('none');
+  });
 }
-applyChartTheme();
-window.onThemeChange = applyChartTheme;
 
-// Wave / Bar toggle
+buildRevenueChart('bar');
+
+window.onThemeChange = function() { buildRevenueChart(document.querySelector('#chartTypeToggle .active').dataset.type); };
+
 document.querySelectorAll('#chartTypeToggle button').forEach(btn => {
   btn.addEventListener('click', function() {
     document.querySelectorAll('#chartTypeToggle button').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
-    const isArea = this.dataset.type === 'area';
-    chart.config.type = isArea ? 'line' : 'bar';
-    chart.options.scales.x.stacked = true;
-    chart.options.scales.y.stacked = true;
-    chart.data.datasets.forEach(ds => {
-      if (isArea) {
-        ds.fill = true;
-        ds.tension = 0.4;
-        ds.pointRadius = 3;
-        ds.borderWidth = 2;
-        ds.backgroundColor = ds._color + 'aa';
-        ds.borderRadius = undefined;
-      } else {
-        ds.fill = false;
-        ds.tension = 0;
-        ds.pointRadius = 0;
-        ds.borderWidth = 0;
-        ds.backgroundColor = ds._color;
-        ds.borderRadius = 4;
-      }
-    });
-    chart.update();
+    buildRevenueChart(this.dataset.type);
   });
 });
 </script>

@@ -17,7 +17,28 @@
       "Read(//mnt/c/Users/ocohen/pos/**)",
       "Bash(python manage.py import_pos_files)",
       "Bash(echo \"Exit: $?\")",
-      "Bash(python manage.py shell -c ' *)"
+      "Bash(python manage.py shell -c ' *)",
+      "Bash(cp \"/c/Users/ocohen/OneDrive - Kramer Electronics Ltd/POS Project/Q1_2026_POS_ASEAN.xlsx\" \"/c/Users/ocohen/pos/pos_files/\")",
+      "Bash(cp \"/c/Users/ocohen/OneDrive - Kramer Electronics Ltd/POS Project/Q1_2026_POS_GreaterChina.xlsx\" \"/c/Users/ocohen/pos/pos_files/\")",
+      "Bash(cp \"/c/Users/ocohen/OneDrive - Kramer Electronics Ltd/POS Project/Q1_2026_POS_Northeast Asia.xlsx\" \"/c/Users/ocohen/pos/pos_files/\")",
+      "Bash(cp \"/c/Users/ocohen/OneDrive - Kramer Electronics Ltd/POS Project/Q1_2026_POS_Oceania.xlsx\" \"/c/Users/ocohen/pos/pos_files/\")",
+      "Bash(cp \"/c/Users/ocohen/OneDrive - Kramer Electronics Ltd/POS Project/Q1_2026_POS_SAARC.xlsx\" \"/c/Users/ocohen/pos/pos_files/\")",
+      "Bash(docker restart *)",
+      "Bash(docker exec pos-web-1 python manage.py shell -c ' *)",
+      "Skill(kramer-brand)",
+      "Skill(kramer-brand:*)",
+      "Bash(claude config *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(python manage.py runserver 8001)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\ocohen\\\\OneDrive - Kramer Electronics Ltd\\\\POS Project\")",
+      "Bash(Sort-Object LastWriteTime -Descending)",
+      "Bash(Select-Object Name, LastWriteTime, Length)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(ls -la \"/mnt/c/Users/ocohen/OneDrive - Kramer Electronics Ltd/POS Project/\" 2>&1 | head -30)",
+      "Read(//mnt/c/Users/ocohen/OneDrive - Kramer Electronics Ltd/**)",
+      "Bash(ls \"/mnt/c/Users/ocohen/\" 2>&1 | head -20)",
+      "Read(//mnt/c/Users/**)"
     ]
   }
 }

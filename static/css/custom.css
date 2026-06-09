@@ -184,6 +184,32 @@ h1, h2, h3, h4, h5, h6 {
 .kpi-countries { border-top: 3px solid #F59E0B; }
 .kpi-countries .kpi-icon-wrap { color: #F59E0B; }
 
+/* ── Region strip ── */
+.region-strip {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.region-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  flex: 1;
+  min-width: 180px;
+  box-shadow: var(--shadow-card);
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.region-strip-item:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+  color: var(--text-primary);
+}
+
 /* ── Dashboard filter bar ── */
 .filter-label {
   font-size: 0.68rem;
