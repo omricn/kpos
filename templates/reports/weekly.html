@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <a href="{% url 'dashboard' %}" class="text-decoration-none text-muted small">
+      <i class="bi bi-chevron-left me-1"></i>Dashboard
+    </a>
+    <h4 class="mb-1 fw-bold mt-1">Sales by Week</h4>
+    <p class="text-muted small mb-0">Weekly revenue trend — grouped by {{ group_label }}</p>
+  </div>
+  <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
+    <i class="bi bi-cloud-upload me-1"></i>Upload
+  </a>
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-3 align-items-end" method="get" id="weeklyForm">
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="dateRangePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="hiddenDateTo"   value="{{ filters.date_to }}">
+        </div>
+      </div>
+      <div class="col-auto">
+        <label class="filter-label">Group By</label>
+        <div class="btn-group" id="byGroup">
+          <a href="?by=region{% if filters.date_from %}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% endif %}"
+             class="btn btn-sm {% if by == 'region' %}btn-kramer{% else %}btn-outline-secondary{% endif %}">
+            <i class="bi bi-globe2 me-1"></i>Region
+          </a>
+          <a href="?by=distributor{% if filters.date_from %}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% endif %}"
+             class="btn btn-sm {% if by == 'distributor' %}btn-kramer{% else %}btn-outline-secondary{% endif %}">
+            <i class="bi bi-building me-1"></i>Distributor
+          </a>
+          <a href="?by=country{% if filters.date_from %}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% endif %}"
+             class="btn btn-sm {% if by == 'country' %}btn-kramer{% else %}btn-outline-secondary{% endif %}">
+            <i class="bi bi-flag me-1"></i>Country
+          </a>
+          <a href="?by=product{% if filters.date_from %}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% endif %}"
+             class="btn btn-sm {% if by == 'product' %}btn-kramer{% else %}btn-outline-secondary{% endif %}">
+            <i class="bi bi-box-seam me-1"></i>Product
+          </a>
+        </div>
+      </div>
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
+        {% if has_filters %}
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'weekly' %}?by={{ by }}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="mb-0 fw-bold">Weekly Revenue by {{ group_label }}</h6>
+      <div class="btn-group btn-group-sm" id="chartTypeToggle">
+        <button class="btn btn-outline-secondary" data-type="line"><i class="bi bi-activity me-1"></i>Line</button>
+        <button class="btn btn-outline-secondary active" data-type="bar"><i class="bi bi-bar-chart-fill me-1"></i>Bar</button>
+      </div>
+    </div>
+    <div style="position:relative;height:380px">
+      <canvas id="weeklyChart"></canvas>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const rawData = {{ chart_data|safe }};
+const currSym = '{{ currency_symbol }}';
+function fmtMoney(v) {
+  if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
+  return currSym + Math.round(v).toLocaleString();
+}
+const isDark = () => document.documentElement.getAttribute('data-bs-theme') === 'dark';
+
+const ctx = document.getElementById('weeklyChart').getContext('2d');
+const chartConfig = {
+  type: 'bar',
+  data: rawData,
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { usePointStyle: true, padding: 20, font: { size: 12 },
+                  color: isDark() ? '#DCDDDE' : '#44445a' }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => ' ' + ctx.dataset.label + ': ' + fmtMoney(ctx.raw || 0),
+          footer: items => ' Total: ' + fmtMoney(items.reduce((s, i) => s + (i.raw || 0), 0))
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false },
+           ticks: { color: isDark() ? '#636366' : '#666', font: { size: 11 }, maxRotation: 45 } },
+      y: { grid: { color: isDark() ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
+           ticks: { color: isDark() ? '#636366' : '#666', callback: v => fmtMoney(v) } }
+    }
+  }
+};
+const chart = new Chart(ctx, chartConfig);
+
+document.querySelectorAll('#chartTypeToggle button').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#chartTypeToggle button').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const isLine = this.dataset.type === 'line';
+    chart.config.type = isLine ? 'line' : 'bar';
+    chart.data.datasets.forEach(ds => {
+      if (isLine) {
+        ds.fill = false; ds.tension = 0.3; ds.pointRadius = 3; ds.borderWidth = 2;
+        ds.backgroundColor = ds._color + 'aa';
+      } else {
+        ds.fill = false; ds.tension = 0; ds.pointRadius = 0; ds.borderWidth = 0;
+        ds.backgroundColor = ds._color;
+      }
+    });
+    chart.update();
+  });
+});
+
+window.onThemeChange = function() {
+  const dark = isDark();
+  chart.options.scales.x.ticks.color = dark ? '#636366' : '#666';
+  chart.options.scales.y.ticks.color = dark ? '#636366' : '#666';
+  chart.options.scales.y.grid.color  = dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+  chart.options.plugins.legend.labels.color = dark ? '#DCDDDE' : '#44445a';
+  chart.update('none');
+};
+
+document.getElementById('weeklyForm').addEventListener('submit', function(e) {
+  const by = '{{ by }}';
+  const existing = this.querySelector('input[name="by"]');
+  if (!existing) {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'by'; inp.value = by;
+    this.appendChild(inp);
+  }
+});
+
+(function() {
+  const hf = document.getElementById('hiddenDateFrom').value;
+  const ht = document.getElementById('hiddenDateTo').value;
+  window._fp = flatpickr('#dateRangePicker', {
+    mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'M j, Y',
+    onChange: function(d) {
+      document.getElementById('hiddenDateFrom').value = d[0] ? window._fp.formatDate(d[0],'Y-m-d') : '';
+      document.getElementById('hiddenDateTo').value   = d[1] ? window._fp.formatDate(d[1],'Y-m-d') : '';
+    }
+  });
+  if (hf) window._fp.setDate([hf, ht || hf]);
+})();
+</script>
+{% endblock %}

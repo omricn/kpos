@@ -78,3 +78,13 @@ class POSRecord(models.Model):
 
     def __str__(self):
         return f"{self.customer_name} — {self.product_name} ({self.invoice_date})"
+
+
+class ExchangeRate(models.Model):
+    currency = models.CharField(max_length=3, unique=True)
+    rate_to_usd = models.DecimalField(max_digits=12, decimal_places=6)
+    rate_to_eur = models.DecimalField(max_digits=12, decimal_places=6)
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.currency}: 1 = ${self.rate_to_usd} / €{self.rate_to_eur}"

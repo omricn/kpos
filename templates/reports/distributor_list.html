@@ -52,7 +52,7 @@
           </div>
           <div class="d-flex justify-content-between align-items-end">
             <div>
-              <div class="fw-bold fs-5" style="color:{{ r.color }}">${{ r.revenue|floatformat:0|intcomma }}</div>
+              <div class="fw-bold fs-5" style="color:{{ r.color }}">{{ currency_symbol }}{{ r.revenue|floatformat:0|intcomma }}</div>
               <div class="text-muted small">{{ r.records|intcomma }} records</div>
             </div>
             <i class="bi bi-arrow-right-circle fs-4" style="color:{{ r.color }}"></i>
@@ -73,7 +73,7 @@
       <thead style="background:#fafafa">
         <tr>
           <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Distributor</th>
-          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue (USD)</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Records</th>
           <th class="pe-4"></th>
         </tr>
@@ -85,7 +85,7 @@
             <div class="fw-semibold" class="text-body">{{ d.name }}</div>
           </td>
           <td class="text-end fw-bold text-revenue">
-            {% if d.total_revenue %}${{ d.total_revenue|floatformat:0|intcomma }}{% else %}—{% endif %}
+            {% if d.total_revenue %}{{ currency_symbol }}{{ d.total_revenue|floatformat:0|intcomma }}{% else %}—{% endif %}
           </td>
           <td class="text-end text-muted">{{ d.total_records|intcomma }}</td>
           <td class="text-end pe-4">

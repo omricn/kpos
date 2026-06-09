@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <a href="{% url 'dashboard' %}" class="text-decoration-none text-muted small">
+      <i class="bi bi-chevron-left me-1"></i>Dashboard
+    </a>
+    <h4 class="mb-1 fw-bold mt-1">Units Sold</h4>
+    <p class="text-muted small mb-0">Product sell-through ranked by quantity</p>
+  </div>
+  <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
+    <i class="bi bi-cloud-upload me-1"></i>Upload
+  </a>
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-3 align-items-end" method="get">
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="dateRangePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="hiddenDateTo"   value="{{ filters.date_to }}">
+        </div>
+      </div>
+      <div class="col-auto">
+        <label class="filter-label">Category</label>
+        <select class="form-select filter-input" name="category" style="min-width:200px">
+          <option value="">All Categories</option>
+          {% for cat in all_categories %}
+          <option value="{{ cat }}" {% if cat in selected_categories %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="filter-label">View By</label>
+        <select class="form-select filter-input" name="view_by">
+          <option value="product" {% if view_by == 'product' %}selected{% endif %}>Product</option>
+          <option value="category" {% if view_by == 'category' %}selected{% endif %}>Category</option>
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
+        {% if has_filters %}
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'units' %}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Top 3 Podium -->
+{% if top3 %}
+<div class="row g-3 mb-4 justify-content-center">
+  {% for p in top3 %}
+  <div class="col-12 col-md-4">
+    <div class="card border-0 shadow-sm h-100" style="border-top:4px solid {% if forloop.counter == 1 %}#FCD34D{% elif forloop.counter == 2 %}#9CA3AF{% else %}#D97706{% endif %} !important">
+      <div class="card-body p-4 text-center">
+        <div class="mb-2" style="font-size:2rem">
+          {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}
+        </div>
+        <div class="fw-bold fs-6 mb-1 text-truncate" title="{{ p.name }}" style="max-width:100%">{{ p.name }}</div>
+        <div class="fw-bold mb-1" style="color:var(--kramer-purple);font-size:1.4rem">{{ p.units|intcomma }}</div>
+        <div class="text-muted small">units · {{ currency_symbol }}{{ p.revenue|floatformat:0|intcomma }} revenue</div>
+        <div class="text-muted small mt-1">{{ p.share_pct }}% of total units</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Chart -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="mb-0 fw-bold">Units by {% if view_by == 'category' %}Category{% else %}Product{% endif %}</h6>
+      <div class="btn-group btn-group-sm" id="metricToggle">
+        <button class="btn btn-kramer active" data-metric="units">Units</button>
+        <button class="btn btn-outline-secondary" data-metric="revenue">Revenue</button>
+      </div>
+    </div>
+    <div style="position:relative;height:{% if product_data|length > 10 %}500px{% else %}300px{% endif %}">
+      <canvas id="unitsChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Full table -->
+{% if product_data %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3">
+    <h6 class="mb-0 fw-bold">All {% if view_by == 'category' %}Categories{% else %}Products{% endif %} ({{ product_data|length }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr style="background:var(--bg-elevated)">
+          <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold">#</th>
+          <th class="text-uppercase small text-muted fw-semibold">{% if view_by == 'category' %}Category{% else %}Product{% endif %}</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Units Sold</th>
+          <th class="text-uppercase small text-muted fw-semibold" style="min-width:140px">Share</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Revenue ({{ selected_currency }})</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in product_data %}
+        <tr>
+          <td class="ps-4 text-muted small">{{ forloop.counter }}</td>
+          <td class="fw-semibold" style="max-width:300px">
+            <span class="text-truncate d-block" title="{{ p.name }}">{{ p.name }}</span>
+          </td>
+          <td class="text-end fw-bold" style="color:var(--kramer-purple)">{{ p.units|intcomma }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="dist-share-track flex-grow-1">
+                <div class="dist-share-fill" style="width:{{ p.share_pct }}%"></div>
+              </div>
+              <span class="text-muted small" style="min-width:38px">{{ p.share_pct }}%</span>
+            </div>
+          </td>
+          <td class="text-end text-muted pe-4">{{ currency_symbol }}{{ p.revenue|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+  <i class="bi bi-box-seam display-1 text-muted"></i>
+  <p class="mt-3 text-muted">No product data found.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const chartData = {{ chart_data|safe }};
+const currSym = '{{ currency_symbol }}';
+function fmtMoney(v) {
+  if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
+  return currSym + Math.round(v).toLocaleString();
+}
+const isDark = () => document.documentElement.getAttribute('data-bs-theme') === 'dark';
+const purple = '#8205B4';
+
+const ctx = document.getElementById('unitsChart').getContext('2d');
+let currentMetric = 'units';
+const chartConfig = {
+  type: 'bar',
+  data: {
+    labels: chartData.labels,
+    datasets: [{
+      label: 'Units Sold',
+      data: chartData.units,
+      backgroundColor: purple + 'cc',
+      borderColor: purple,
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => currentMetric === 'units'
+            ? ' ' + ctx.raw.toLocaleString() + ' units'
+            : ' ' + fmtMoney(ctx.raw)
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: isDark() ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
+           ticks: { color: isDark() ? '#636366' : '#666',
+                    callback: v => currentMetric === 'units' ? v.toLocaleString() : fmtMoney(v) } },
+      y: { grid: { display: false },
+           ticks: { color: isDark() ? '#DCDDDE' : '#333', font: { size: 10 } } }
+    }
+  }
+};
+const chart = new Chart(ctx, chartConfig);
+
+document.querySelectorAll('#metricToggle button').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#metricToggle button').forEach(b => b.className = 'btn btn-outline-secondary');
+    this.className = 'btn btn-kramer active';
+    currentMetric = this.dataset.metric;
+    chart.data.datasets[0].data = chartData[currentMetric];
+    chart.data.datasets[0].label = currentMetric === 'units' ? 'Units Sold' : 'Revenue ({{ selected_currency }})';
+    chart.options.scales.x.ticks.callback = v => currentMetric === 'units' ? v.toLocaleString() : fmtMoney(v);
+    chart.update();
+  });
+});
+
+window.onThemeChange = function() {
+  const dark = isDark();
+  chart.options.scales.x.grid.color = dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+  chart.options.scales.x.ticks.color = dark ? '#636366' : '#666';
+  chart.options.scales.y.ticks.color = dark ? '#DCDDDE' : '#333';
+  chart.update('none');
+};
+
+(function() {
+  const hf = document.getElementById('hiddenDateFrom').value;
+  const ht = document.getElementById('hiddenDateTo').value;
+  window._fp = flatpickr('#dateRangePicker', {
+    mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'M j, Y',
+    onChange: function(d) {
+      document.getElementById('hiddenDateFrom').value = d[0] ? window._fp.formatDate(d[0],'Y-m-d') : '';
+      document.getElementById('hiddenDateTo').value   = d[1] ? window._fp.formatDate(d[1],'Y-m-d') : '';
+    }
+  });
+  if (hf) window._fp.setDate([hf, ht || hf]);
+})();
+</script>
+{% endblock %}

@@ -7,4 +7,9 @@ urlpatterns = [
     path('distributors/', views.distributor_list, name='distributor_list'),
     path('distributor/<int:pk>/', views.distributor_records, name='distributor_records'),
     path('distributor/<int:pk>/export/', views.export_csv, name='export_csv'),
+    path('countries/', views.countries_view, name='countries'),
+    path('units/', views.units_view, name='units'),
+    path('revenue/', views.revenue_view, name='revenue'),
+    path('weekly/', views.weekly_view, name='weekly'),
+    path('set-currency/', views.set_currency, name='set_currency'),
 ]

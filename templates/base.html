@@ -49,6 +49,14 @@
         <span class="navbar-text d-none d-lg-inline">
           <i class="bi bi-diagram-3 me-1"></i>Phase 1 — Local
         </span>
+        <form method="post" action="{% url 'set_currency' %}" class="d-inline me-2">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="submit" name="currency" value="USD" class="btn {% if request.session.currency == 'EUR' %}btn-outline-secondary{% else %}btn-primary{% endif %} px-2 py-1">$ USD</button>
+            <button type="submit" name="currency" value="EUR" class="btn {% if request.session.currency == 'EUR' %}btn-primary{% else %}btn-outline-secondary{% endif %} px-2 py-1">€ EUR</button>
+          </div>
+        </form>
         <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
           <i class="bi bi-sun-fill" id="iconLight" style="display:none"></i>
           <i class="bi bi-moon-fill" id="iconDark"></i>

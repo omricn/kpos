@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <a href="{% url 'dashboard' %}" class="text-decoration-none text-muted small">
+      <i class="bi bi-chevron-left me-1"></i>Dashboard
+    </a>
+    <h4 class="mb-1 fw-bold mt-1">Total Revenue Breakdown</h4>
+    <p class="text-muted small mb-0">Revenue distribution across all dimensions — all figures in {{ selected_currency }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'weekly' %}?by=region" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-calendar-week me-1"></i>Weekly View
+    </a>
+    <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
+      <i class="bi bi-cloud-upload me-1"></i>Upload
+    </a>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-3 align-items-end" method="get">
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="dateRangePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="hiddenDateTo"   value="{{ filters.date_to }}">
+        </div>
+      </div>
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
+        {% if has_filters %}
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'revenue' %}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+      <div class="col-auto ms-auto">
+        <div class="text-end">
+          <div class="text-muted small">Total Revenue</div>
+          <div class="fw-bold fs-5 text-revenue">{{ currency_symbol }}{{ total_revenue|floatformat:0|intcomma }}</div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs mb-4" id="revenueTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-region">
+      <i class="bi bi-globe2 me-1"></i>By Region
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-country">
+      <i class="bi bi-flag me-1"></i>By Country
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-dist">
+      <i class="bi bi-building me-1"></i>By Distributor
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-product">
+      <i class="bi bi-box-seam me-1"></i>By Product
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="revenueTabContent">
+
+  <!-- ── Region ── -->
+  <div class="tab-pane fade show active" id="tab-region">
+    {% if region_data %}
+    <div class="row g-3 mb-4">
+      {% for r in region_data|slice:":3" %}
+      <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm" style="border-top:4px solid {{ r.color }} !important">
+          <div class="card-body p-4 text-center">
+            <div class="mb-2" style="font-size:2rem">
+              {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}
+            </div>
+            <div class="fw-bold fs-5 mb-1">{{ r.name }}</div>
+            <div class="fw-bold mb-1" style="color:var(--revenue-color);font-size:1.3rem">{{ currency_symbol }}{{ r.revenue|floatformat:0|intcomma }}</div>
+            <div class="text-muted small">{{ r.share_pct }}% of total · {{ r.units|intcomma }} units</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="mb-3 fw-bold">Revenue by Region</h6>
+        <div style="position:relative;height:200px"><canvas id="regionChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Country ── -->
+  <div class="tab-pane fade" id="tab-country">
+    {% if country_data %}
+    <div class="row g-3 mb-4">
+      {% for c in country_data|slice:":3" %}
+      <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm" style="border-top:4px solid {% if forloop.counter == 1 %}#FCD34D{% elif forloop.counter == 2 %}#9CA3AF{% else %}#D97706{% endif %} !important">
+          <div class="card-body p-4 text-center">
+            <div class="mb-2" style="font-size:2rem">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}</div>
+            <div class="fw-bold fs-5 mb-1">{{ c.display_name }}</div>
+            <div class="fw-bold mb-1" style="color:var(--revenue-color);font-size:1.3rem">{{ currency_symbol }}{{ c.revenue|floatformat:0|intcomma }}</div>
+            <div class="text-muted small">{{ c.share_pct }}% of top 20</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="mb-3 fw-bold">Top 20 Countries by Revenue</h6>
+        <div style="position:relative;height:{% if country_data|length > 10 %}500px{% else %}300px{% endif %}">
+          <canvas id="countryChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Distributor ── -->
+  <div class="tab-pane fade" id="tab-dist">
+    {% if dist_data %}
+    <div class="row g-3 mb-4">
+      {% for d in dist_data|slice:":3" %}
+      <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm" style="border-top:4px solid {% if forloop.counter == 1 %}#FCD34D{% elif forloop.counter == 2 %}#9CA3AF{% else %}#D97706{% endif %} !important">
+          <div class="card-body p-4 text-center">
+            <div class="mb-2" style="font-size:2rem">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}</div>
+            <div class="fw-bold fs-5 mb-1">{{ d.distributor__name }}</div>
+            <div class="text-muted small mb-1">{{ d.distributor__region }}</div>
+            <div class="fw-bold mb-1" style="color:var(--revenue-color);font-size:1.3rem">{{ currency_symbol }}{{ d.revenue|floatformat:0|intcomma }}</div>
+            <div class="text-muted small">{{ d.share_pct }}% of total</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="mb-3 fw-bold">Revenue by Distributor</h6>
+        <div style="position:relative;height:{% if dist_data|length > 10 %}500px{% else %}300px{% endif %}">
+          <canvas id="distChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Product ── -->
+  <div class="tab-pane fade" id="tab-product">
+    {% if product_data %}
+    <div class="row g-3 mb-4">
+      {% for p in product_data|slice:":3" %}
+      <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm" style="border-top:4px solid {% if forloop.counter == 1 %}#FCD34D{% elif forloop.counter == 2 %}#9CA3AF{% else %}#D97706{% endif %} !important">
+          <div class="card-body p-4 text-center">
+            <div class="mb-2" style="font-size:2rem">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}</div>
+            <div class="fw-bold fs-5 mb-1">{{ p.product_level_1 }}</div>
+            <div class="fw-bold mb-1" style="color:var(--revenue-color);font-size:1.3rem">{{ currency_symbol }}{{ p.revenue|floatformat:0|intcomma }}</div>
+            <div class="text-muted small">{{ p.share_pct }}% of top 15</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="mb-3 fw-bold">Top 15 Product Categories by Revenue</h6>
+        <div style="position:relative;height:{% if product_data|length > 8 %}400px{% else %}250px{% endif %}">
+          <canvas id="productChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const currSym = '{{ currency_symbol }}';
+function fmtMoney(v) {
+  if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
+  return currSym + Math.round(v).toLocaleString();
+}
+const isDark = () => document.documentElement.getAttribute('data-bs-theme') === 'dark';
+const purple = '#8205B4';
+
+function makeHBar(canvasId, labels, values, colors) {
+  const el = document.getElementById(canvasId);
+  if (!el) return null;
+  return new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors ? colors.map(c => c + 'cc') : purple + 'cc',
+        borderColor: colors || purple,
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + fmtMoney(ctx.raw) } }
+      },
+      scales: {
+        x: { grid: { color: isDark() ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
+             ticks: { color: isDark() ? '#636366' : '#666', callback: v => fmtMoney(v) } },
+        y: { grid: { display: false },
+             ticks: { color: isDark() ? '#DCDDDE' : '#333', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+const regionData  = {{ region_chart|safe }};
+const countryData = {{ country_chart|safe }};
+const distData    = {{ dist_chart|safe }};
+const productData = {{ product_chart|safe }};
+
+const charts = {};
+function initChart(tabId) {
+  if (tabId === 'tab-region' && !charts.region) {
+    charts.region = makeHBar('regionChart', regionData.labels, regionData.revenue, regionData.colors);
+  } else if (tabId === 'tab-country' && !charts.country) {
+    charts.country = makeHBar('countryChart', countryData.labels, countryData.revenue, null);
+  } else if (tabId === 'tab-dist' && !charts.dist) {
+    charts.dist = makeHBar('distChart', distData.labels, distData.revenue, distData.colors);
+  } else if (tabId === 'tab-product' && !charts.product) {
+    charts.product = makeHBar('productChart', productData.labels, productData.revenue, null);
+  }
+}
+
+initChart('tab-region');
+
+document.querySelectorAll('#revenueTabs button').forEach(btn => {
+  btn.addEventListener('shown.bs.tab', function(e) {
+    initChart(e.target.getAttribute('data-bs-target').replace('#', ''));
+  });
+});
+
+window.onThemeChange = function() {
+  Object.values(charts).forEach(c => {
+    if (!c) return;
+    const dark = isDark();
+    c.options.scales.x.grid.color = dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+    c.options.scales.x.ticks.color = dark ? '#636366' : '#666';
+    c.options.scales.y.ticks.color = dark ? '#DCDDDE' : '#333';
+    c.update('none');
+  });
+};
+
+(function() {
+  const hf = document.getElementById('hiddenDateFrom').value;
+  const ht = document.getElementById('hiddenDateTo').value;
+  window._fp = flatpickr('#dateRangePicker', {
+    mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'M j, Y',
+    onChange: function(d) {
+      document.getElementById('hiddenDateFrom').value = d[0] ? window._fp.formatDate(d[0],'Y-m-d') : '';
+      document.getElementById('hiddenDateTo').value   = d[1] ? window._fp.formatDate(d[1],'Y-m-d') : '';
+    }
+  });
+  if (hf) window._fp.setDate([hf, ht || hf]);
+})();
+</script>
+{% endblock %}

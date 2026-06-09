@@ -7,7 +7,7 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
     <h4 class="mb-0 fw-bold">Revenue Overview</h4>
-    <p class="text-muted small mb-0">Global distributor sell-through — all figures in USD</p>
+    <p class="text-muted small mb-0">Global distributor sell-through — all figures in {{ selected_currency }}</p>
   </div>
   <div class="d-flex gap-2">
     <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#topProductsPanel">
@@ -47,7 +47,7 @@
             <span class="text-muted" style="font-size:.75rem;white-space:nowrap">{{ p.units|intcomma }} units</span>
           </div>
         </div>
-        <div class="fw-bold" style="color:#16a34a;font-size:.92rem;white-space:nowrap">${{ p.revenue|floatformat:0|intcomma }}</div>
+        <div class="fw-bold" style="color:#16a34a;font-size:.92rem;white-space:nowrap">{{ currency_symbol }}{{ p.revenue|floatformat:0|intcomma }}</div>
       </div>
     </div>
     {% empty %}
@@ -122,7 +122,7 @@
     <a href="{% url 'distributor_list' %}" class="text-decoration-none">
       <div class="kpi-card kpi-revenue kpi-clickable">
         <div class="kpi-icon-wrap"><i class="bi bi-currency-dollar"></i></div>
-        <div class="kpi-amount">${{ total_revenue|floatformat:0|intcomma }}</div>
+        <div class="kpi-amount">{{ currency_symbol }}{{ total_revenue|floatformat:0|intcomma }}</div>
         <div class="kpi-label">Total Revenue</div>
       </div>
     </a>
@@ -185,7 +185,7 @@
         <tr style="background:#fafafa">
           <th class="ps-4 text-uppercase small text-muted fw-semibold py-3" style="letter-spacing:.05em">Distributor</th>
           <th class="text-uppercase small text-muted fw-semibold">Region</th>
-          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue (USD)</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Countries</th>
           <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Records</th>
@@ -199,7 +199,7 @@
             {{ d.distributor__name }}
           </td>
           <td><span class="badge badge-region rounded-pill">{{ d.distributor__region|default:"—" }}</span></td>
-          <td class="text-end fw-bold text-revenue fs-6">${{ d.revenue|floatformat:0|intcomma }}</td>
+          <td class="text-end fw-bold text-revenue fs-6">{{ currency_symbol }}{{ d.revenue|floatformat:0|intcomma }}</td>
           <td class="text-end text-muted">{{ d.units|intcomma }}</td>
           <td class="text-end text-muted">{{ d.countries }}</td>
           <td class="text-end text-muted pe-4">{{ d.records|intcomma }}</td>

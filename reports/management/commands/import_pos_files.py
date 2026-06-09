@@ -20,11 +20,19 @@ def _find_pos_dir():
 POS_DIR = _find_pos_dir() or _CANDIDATE_DIRS[0]
 
 IMPORT_CONFIG = [
-    {'file': 'Q1_2026_POS_ASEAN.xlsx',          'region': 'APAC', 'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_GreaterChina.xlsx',    'region': 'APAC', 'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_Northeast Asia.xlsx',  'region': 'APAC', 'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_Oceania.xlsx',         'region': 'APAC', 'period': 'Q1 2026'},
-    {'file': 'Q1_2026_POS_SAARC.xlsx',           'region': 'APAC', 'period': 'Q1 2026'},
+    # APAC files
+    {'file': 'Q1_2026_POS_ASEAN.xlsx',          'parser': 'asean',          'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_GreaterChina.xlsx',   'parser': 'asean',          'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_Northeast Asia.xlsx', 'parser': 'asean',          'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_Oceania.xlsx',        'parser': 'asean',          'region': 'APAC', 'period': 'Q1 2026'},
+    {'file': 'Q1_2026_POS_SAARC.xlsx',          'parser': 'asean',          'region': 'APAC', 'period': 'Q1 2026'},
+    # EMEA files (new)
+    # Direct and Disti Sales 2026.xlsx excluded:
+    #   ALSO FI, Netsmart, Captech are duplicates of Kramer_Reports_20260519 (Bomisco)
+    #   F9 unique rows already merged into Bomisco upload
+    #   Fineman and Midwich have no overlap — import separately if needed
+    {'file': 'Kramer and ZeeVee sales.xlsx',             'parser': 'midwich-zeevee', 'region': 'EMEA', 'period': 'Q1 2026'},
+    {'file': 'Kramer_Reports_20260519.xlsx',              'parser': 'emea-bomisco',   'region': 'EMEA', 'period': '2024-2026'},
 ]
 
 # Codes that should not be touched by this command
@@ -55,7 +63,7 @@ class Command(BaseCommand):
 
         # Update CDEV region
         Distributor.objects.filter(code='cdev').update(region='EMEA')
-        self.stdout.write('  Updated CDEV region → Europe')
+        self.stdout.write('  Updated CDEV region -> EMEA')
 
         # Remove old regional grouping distributors (not real companies)
         old_codes = {'asean', 'greater-china', 'northeast-asia', 'oceania', 'saarc'}
@@ -72,8 +80,8 @@ class Command(BaseCommand):
 
             self.stdout.write(f"\n  Processing: {cfg['file']} ({cfg['region']})")
 
-            parser = get_parser('asean')  # all use standard_kramer parser
-            wb = openpyxl.load_workbook(filepath, data_only=True)
+            parser = get_parser(cfg.get('parser', 'asean'))
+            wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
             all_records = parser(wb)
 
             if not all_records:
