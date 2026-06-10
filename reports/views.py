@@ -551,6 +551,12 @@ def upload_file(request):
             ]
             POSRecord.objects.bulk_create(bulk_records)
 
+            try:
+                from django.core.management import call_command
+                call_command('update_monthly_rates', verbosity=0)
+            except Exception:
+                pass
+
             messages.success(request, f'Successfully imported {len(parsed_rows)} records from "{excel_file.name}".')
             return redirect('distributor_records', pk=distributor.pk)
     else:

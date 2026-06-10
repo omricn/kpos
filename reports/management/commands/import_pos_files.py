@@ -2,6 +2,7 @@ import os
 import openpyxl
 from collections import defaultdict
 from django.core.management.base import BaseCommand
+from django.core.management import call_command
 from django.utils.text import slugify
 from reports.models import Distributor, POSUpload, POSRecord
 from reports.parsers import get_parser
@@ -121,3 +122,5 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(self.style.SUCCESS('\nImport complete.'))
+        self.stdout.write('Refreshing monthly exchange rates...')
+        call_command('update_monthly_rates', stdout=self.stdout)
