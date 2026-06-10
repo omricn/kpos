@@ -88,3 +88,19 @@ class ExchangeRate(models.Model):
 
     def __str__(self):
         return f"{self.currency}: 1 = ${self.rate_to_usd} / €{self.rate_to_eur}"
+
+
+class MonthlyRate(models.Model):
+    """Historical monthly exchange rates from ECB (rates as of month average)."""
+    year = models.IntegerField()
+    month = models.IntegerField()
+    currency = models.CharField(max_length=3)
+    rate_to_usd = models.DecimalField(max_digits=12, decimal_places=6)
+    rate_to_eur = models.DecimalField(max_digits=12, decimal_places=6)
+
+    class Meta:
+        unique_together = [('year', 'month', 'currency')]
+        indexes = [models.Index(fields=['year', 'month', 'currency'])]
+
+    def __str__(self):
+        return f"{self.currency} {self.year}-{self.month:02d}: 1 = ${self.rate_to_usd} / €{self.rate_to_eur}"
