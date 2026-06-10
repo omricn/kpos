@@ -675,6 +675,11 @@ def distributor_list(request):
         d['units'] = int(d['units'] or 0)
         d['share_pct'] = round(d['revenue'] / total_rev * 100, 1)
         d['color'] = REGION_COLORS.get(d['distributor__region'], '#8205B4')
+        # Template-friendly aliases (template uses d.pk, d.name, d.total_revenue, d.total_records)
+        d['pk'] = d['distributor__id']
+        d['name'] = d['distributor__name']
+        d['total_revenue'] = d['revenue']
+        d['total_records'] = d['records']
 
     top3 = dist_data[:3]
 
