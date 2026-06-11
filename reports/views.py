@@ -700,9 +700,12 @@ def distributor_list(request):
     if selected_region:
         filtered_distributors = dist_data
 
+    region_info = next((r for r in region_stats if r['name'] == selected_region), None)
+
     return render(request, 'reports/distributor_list.html', {
         'all_distributors': all_distributors,
         'region_stats': region_stats,
+        'region_info': region_info,
         'selected_region': selected_region,
         'filtered_distributors': filtered_distributors,
         'dist_data': dist_data,
