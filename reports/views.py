@@ -656,6 +656,10 @@ def distributor_list(request):
         d['units'] = int(d['units'] or 0)
         d['share_pct'] = round(d['revenue'] / total_rev * 100, 1)
         d['color'] = REGION_COLORS.get(d['distributor__region'], '#8205B4')
+        d['pk'] = d['distributor__id']
+        d['name'] = d['distributor__name']
+        d['total_revenue'] = d['revenue']
+        d['total_records'] = d['records']
 
     top3 = dist_data[:3]
 
@@ -670,9 +674,12 @@ def distributor_list(request):
     if selected_region:
         filtered_distributors = dist_data
 
+    region_info = next((r for r in region_stats if r['name'] == selected_region), None)
+
     return render(request, 'reports/distributor_list.html', {
         'all_distributors': all_distributors,
         'region_stats': region_stats,
+        'region_info': region_info,
         'selected_region': selected_region,
         'filtered_distributors': filtered_distributors,
         'dist_data': dist_data,

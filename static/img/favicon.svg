@@ -1,0 +1,37 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Track rings (dim background arcs) -->
+  <circle cx="50" cy="50" r="42" fill="none" stroke="#BE0078" stroke-width="7" opacity="0.15"/>
+  <circle cx="50" cy="50" r="30" fill="none" stroke="#8205B4" stroke-width="7" opacity="0.15"/>
+  <circle cx="50" cy="50" r="18" fill="none" stroke="#69FFC3" stroke-width="7" opacity="0.15"/>
+
+  <!-- Colored arcs with glow — rotate(-90) so arc starts from 12 o'clock -->
+  <g filter="url(#glow)">
+    <!-- Outer ring: Kramer Pink — ~66% filled  (C≈264, fill=174) -->
+    <circle cx="50" cy="50" r="42" fill="none"
+      stroke="#BE0078" stroke-width="7" stroke-linecap="round"
+      stroke-dasharray="174 90"
+      transform="rotate(-90 50 50)"/>
+
+    <!-- Middle ring: Kramer Purple — ~25% filled  (C≈188, fill=47) -->
+    <circle cx="50" cy="50" r="30" fill="none"
+      stroke="#8205B4" stroke-width="7" stroke-linecap="round"
+      stroke-dasharray="47 141"
+      transform="rotate(-90 50 50)"/>
+
+    <!-- Inner ring: Kramer Mint — ~55% filled  (C≈113, fill=62) -->
+    <circle cx="50" cy="50" r="18" fill="none"
+      stroke="#69FFC3" stroke-width="7" stroke-linecap="round"
+      stroke-dasharray="62 51"
+      transform="rotate(-90 50 50)"/>
+  </g>
+</svg>
