@@ -11,5 +11,7 @@ urlpatterns = [
     path('units/', views.units_view, name='units'),
     path('revenue/', views.revenue_view, name='revenue'),
     path('weekly/', views.weekly_view, name='weekly'),
+    path('products/', views.product_list, name='product_list'),
+    path('products/detail/', views.product_detail, name='product_detail'),
     path('set-currency/', views.set_currency, name='set_currency'),
 ]

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">Products</h4>
+    <p class="text-muted small mb-0">Sales by item number across all distributors</p>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-2 align-items-end" method="get" id="productFilterForm">
+
+      <!-- Period presets -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Period</label>
+        <div class="btn-group btn-group-sm" id="productPeriodPresets">
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
+        </div>
+      </div>
+
+      <!-- Date range -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="productDatePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="productHiddenFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="productHiddenTo"   value="{{ filters.date_to }}">
+          <input type="hidden" name="period"    id="productHiddenPeriod" value="">
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Search</label>
+        <input type="text" name="q" value="{{ filters.q }}"
+               class="form-control filter-input" placeholder="Part number or description…"
+               style="min-width:200px">
+      </div>
+
+      <!-- Apply / Clear -->
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
+        {% if has_filters %}
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'product_list' %}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- Product table -->
+{% if products %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+    <span class="fw-semibold">{{ products|length }} product{{ products|length|pluralize }}</span>
+    <span class="text-muted small">Based on records with item numbers</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Product</th>
+          <th class="text-uppercase small text-muted fw-semibold">Part Number</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Distributors</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Records</th>
+          <th style="min-width:100px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr style="cursor:pointer" onclick="window.location='{% url 'product_detail' %}?item={{ p.manufacturer_part_no|urlencode }}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}'">
+          <td class="ps-4 py-3 fw-semibold">{% if p.description %}{{ p.description }}{% else %}{{ p.manufacturer_part_no }}{% endif %}</td>
+          <td class="text-muted small">{{ p.manufacturer_part_no }}</td>
+          <td class="text-end fw-bold text-revenue">{{ currency_symbol }}{{ p.revenue|floatformat:0|intcomma }}</td>
+          <td class="text-end text-muted">{{ p.units|intcomma }}</td>
+          <td class="text-end text-muted">{{ p.dist_count }}</td>
+          <td class="text-end text-muted pe-4">{{ p.records|intcomma }}</td>
+          <td class="pe-4">
+            <div style="background:rgba(130,0,180,0.12);border-radius:4px;height:6px;overflow:hidden">
+              <div style="background:var(--kramer-purple);height:100%;width:{{ p.share_pct }}%"></div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="text-center py-5">
+  <i class="bi bi-box-seam display-1 text-muted"></i>
+  <p class="mt-3 text-muted">No products found for the selected filters.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script>
+(function() {
+  const hiddenFrom = document.getElementById('productHiddenFrom').value;
+  const hiddenTo   = document.getElementById('productHiddenTo').value;
+  const fp = flatpickr('#productDatePicker', {
+    mode: 'range',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    onChange: function(selectedDates) {
+      document.getElementById('productHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
+      document.getElementById('productHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    }
+  });
+  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const activePeriod = urlParams.get('period') ||
+    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
+  if (activePeriod) {
+    const activeBtn = document.querySelector('#productPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+
+  const today = new Date();
+  document.querySelectorAll('#productPeriodPresets .period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#productPeriodPresets .period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const p = this.dataset.period;
+      document.getElementById('productHiddenPeriod').value = p;
+      let df = null, dt = null;
+      if (p === 'mtd') {
+        df = new Date(today.getFullYear(), today.getMonth(), 1); dt = today;
+      } else if (p === 'qtd') {
+        const qStart = Math.floor(today.getMonth() / 3) * 3;
+        df = new Date(today.getFullYear(), qStart, 1); dt = today;
+      } else if (p === 'ytd') {
+        df = new Date(today.getFullYear(), 0, 1); dt = today;
+      }
+      if (df && dt) {
+        fp.setDate([df, dt]);
+        document.getElementById('productHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
+        document.getElementById('productHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+      } else {
+        fp.clear();
+        document.getElementById('productHiddenFrom').value = '';
+        document.getElementById('productHiddenTo').value   = '';
+      }
+      document.getElementById('productFilterForm').submit();
+    });
+  });
+})();
+</script>
+{% endblock %}

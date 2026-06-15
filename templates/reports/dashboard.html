@@ -73,7 +73,7 @@
           <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
           <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
           <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn {% if not filters.date_from and not filters.date_to %}active{% endif %}" data-period="all">All</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
         </div>
       </div>
 
@@ -86,6 +86,7 @@
                  placeholder="Select date range…" autocomplete="off" readonly>
           <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ filters.date_from }}">
           <input type="hidden" name="date_to"   id="hiddenDateTo"   value="{{ filters.date_to }}">
+          <input type="hidden" name="period"    id="hiddenPeriod"   value="">
         </div>
       </div>
 
@@ -199,6 +200,47 @@
   </div>
 </div>
 
+<!-- Top Products widget -->
+{% if top_products %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
+    <h6 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2" style="color:var(--kramer-purple)"></i>Top Products</h6>
+    <a href="{% url 'product_list' %}{% if filters.date_from or filters.date_to %}?date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% endif %}" class="btn btn-sm btn-outline-secondary">
+      View all <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Item</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
+          <th class="pe-4" style="min-width:120px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in top_products %}
+        <tr style="cursor:pointer" onclick="window.location='{% url 'product_detail' %}?item={{ p.manufacturer_part_no|urlencode }}'">
+          <td class="ps-4 py-3">
+            <div class="fw-semibold">{% if p.description %}{{ p.description }}{% else %}{{ p.manufacturer_part_no }}{% endif %}</div>
+            <div class="text-muted small">{{ p.manufacturer_part_no }}</div>
+          </td>
+          <td class="text-end fw-bold text-revenue">{{ currency_symbol }}{{ p.revenue|floatformat:0|intcomma }}</td>
+          <td class="text-end text-muted">{{ p.units|intcomma }}</td>
+          <td class="pe-4">
+            <div style="background:rgba(130,0,180,0.12);border-radius:4px;height:6px;overflow:hidden">
+              <div style="background:var(--kramer-purple);height:100%;width:{{ p.pct }}%"></div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <!-- Distributor breakdown table -->
 {% if dist_summary %}
 <div class="card border-0 shadow-sm">
@@ -265,13 +307,22 @@
   });
   if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
 
-  // Period preset buttons
+  // Period preset buttons — set active on click and restore on page load
   const today = new Date();
-  document.querySelectorAll('.period-btn').forEach(btn => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const activePeriod = urlParams.get('period') ||
+    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
+  if (activePeriod) {
+    const activeBtn = document.querySelector('#periodPresets .period-btn[data-period="' + activePeriod + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+
+  document.querySelectorAll('#periodPresets .period-btn').forEach(btn => {
     btn.addEventListener('click', function() {
-      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#periodPresets .period-btn').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
       const p = this.dataset.period;
+      document.getElementById('hiddenPeriod').value = p;
       let df = null, dt = null;
       if (p === 'mtd') {
         df = new Date(today.getFullYear(), today.getMonth(), 1);

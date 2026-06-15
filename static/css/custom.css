@@ -210,6 +210,20 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
+/* ── Period preset buttons ── */
+.period-btn.active,
+.period-btn.active:focus,
+.period-btn.active:hover {
+  background: var(--kramer-purple) !important;
+  color: #fff !important;
+  border-color: var(--kramer-purple) !important;
+}
+.period-btn:hover:not(.active) {
+  background: rgba(130,0,180,0.08);
+  color: var(--kramer-purple);
+  border-color: var(--kramer-purple);
+}
+
 /* ── Dashboard filter bar ── */
 .filter-label {
   font-size: 0.68rem;

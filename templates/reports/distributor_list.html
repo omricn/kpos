@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 
 <!-- Header -->
@@ -30,6 +34,53 @@
       {% endfor %}
     </select>
     <button class="btn btn-kramer btn-sm" onclick="jumpToDist()">Go</button>
+  </div>
+</div>
+
+<!-- ── Filter bar ─────────────────────────────────────────────── -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-2 align-items-end" method="get" id="distFilterForm">
+      {% if selected_region %}
+      <input type="hidden" name="region" value="{{ selected_region }}">
+      {% endif %}
+
+      <!-- Period presets -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Period</label>
+        <div class="btn-group btn-group-sm" id="distPeriodPresets">
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
+        </div>
+      </div>
+
+      <!-- Date range -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="distDatePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="distHiddenFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="distHiddenTo"   value="{{ filters.date_to }}">
+          <input type="hidden" name="period"    id="distHiddenPeriod" value="">
+        </div>
+      </div>
+
+      <!-- Apply / Clear -->
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
+        {% if filters.date_from or filters.date_to %}
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'distributor_list' %}{% if selected_region %}?region={{ selected_region|urlencode }}{% endif %}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+    </form>
   </div>
 </div>
 
@@ -163,6 +214,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 function jumpToDist() {
@@ -172,6 +224,61 @@ function jumpToDist() {
 document.getElementById('distJump').addEventListener('change', function() {
   if (this.value) window.location.href = this.value;
 });
+
+// Date range picker
+(function() {
+  const hiddenFrom = document.getElementById('distHiddenFrom').value;
+  const hiddenTo   = document.getElementById('distHiddenTo').value;
+  const fp = flatpickr('#distDatePicker', {
+    mode: 'range',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    onChange: function(selectedDates) {
+      document.getElementById('distHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
+      document.getElementById('distHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    }
+  });
+  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+
+  // Period preset buttons — set active on click and restore on page load
+  const today = new Date();
+  const urlParams = new URLSearchParams(window.location.search);
+  const activePeriod = urlParams.get('period') ||
+    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
+  if (activePeriod) {
+    const activeBtn = document.querySelector('#distPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+
+  document.querySelectorAll('#distPeriodPresets .period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#distPeriodPresets .period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const p = this.dataset.period;
+      document.getElementById('distHiddenPeriod').value = p;
+      let df = null, dt = null;
+      if (p === 'mtd') {
+        df = new Date(today.getFullYear(), today.getMonth(), 1); dt = today;
+      } else if (p === 'qtd') {
+        const qStart = Math.floor(today.getMonth() / 3) * 3;
+        df = new Date(today.getFullYear(), qStart, 1); dt = today;
+      } else if (p === 'ytd') {
+        df = new Date(today.getFullYear(), 0, 1); dt = today;
+      }
+      if (df && dt) {
+        fp.setDate([df, dt]);
+        document.getElementById('distHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
+        document.getElementById('distHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+      } else {
+        fp.clear();
+        document.getElementById('distHiddenFrom').value = '';
+        document.getElementById('distHiddenTo').value   = '';
+      }
+      document.getElementById('distFilterForm').submit();
+    });
+  });
+})();
 
 {% if selected_region and chart_data %}
 (function() {

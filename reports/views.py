@@ -349,14 +349,18 @@ def dashboard(request):
         'pcts':   [r['pct'] for r in region_cards],
     })
 
-    # Top 10 products
+    # Top 10 products by Kramer part number
     top_products = list(
         _annotate_converted(
-            qs.exclude(product_name='').exclude(product_name__isnull=True),
+            qs.exclude(manufacturer_part_no=''),
             selected_currency, rates
         )
-        .values('product_name')
-        .annotate(revenue=Sum('converted_value'), units=Sum('quantity'))
+        .values('manufacturer_part_no')
+        .annotate(
+            description=Max('product_description'),
+            revenue=Sum('converted_value'),
+            units=Sum('quantity'),
+        )
         .order_by('-revenue')[:10]
     )
     if top_products:
@@ -691,6 +695,140 @@ def distributor_list(request):
         'page_title': 'Distributors',
         'selected_currency': selected_currency,
         'currency_symbol': currency_symbol,
+    })
+
+
+def product_list(request):
+    date_from = request.GET.get('date_from', '').strip()
+    date_to   = request.GET.get('date_to', '').strip()
+    search    = request.GET.get('q', '').strip()
+
+    selected_currency = request.session.get('currency', 'USD')
+    currency_symbol = _currency_symbol(selected_currency)
+    rates = _get_rates()
+
+    qs = POSRecord.objects.exclude(manufacturer_part_no='').filter(invoiced_value__isnull=False)
+    if date_from:
+        qs = qs.filter(invoice_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(invoice_date__lte=date_to)
+    if search:
+        qs = qs.filter(
+            Q(manufacturer_part_no__icontains=search) | Q(product_description__icontains=search)
+        )
+
+    products = list(
+        _annotate_converted(qs, selected_currency, rates)
+        .values('manufacturer_part_no')
+        .annotate(
+            description=Max('product_description'),
+            revenue=Sum('converted_value'),
+            units=Sum('quantity'),
+            dist_count=Count('distributor', distinct=True),
+            records=Count('id'),
+        )
+        .order_by('-revenue')
+    )
+    total_rev = sum(float(p['revenue'] or 0) for p in products) or 1
+    for p in products:
+        p['revenue'] = float(p['revenue'] or 0)
+        p['units'] = int(p['units'] or 0)
+        p['share_pct'] = round(p['revenue'] / total_rev * 100, 1)
+
+    return render(request, 'reports/product_list.html', {
+        'products': products,
+        'filters': {'date_from': date_from, 'date_to': date_to, 'q': search},
+        'has_filters': bool(date_from or date_to or search),
+        'page_title': 'Products',
+        'selected_currency': selected_currency,
+        'currency_symbol': currency_symbol,
+    })
+
+
+def product_detail(request):
+    mfr_pn    = request.GET.get('item', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to   = request.GET.get('date_to', '').strip()
+
+    if not mfr_pn:
+        return redirect('product_list')
+
+    selected_currency = request.session.get('currency', 'USD')
+    currency_symbol = _currency_symbol(selected_currency)
+    rates = _get_rates()
+
+    qs = POSRecord.objects.filter(manufacturer_part_no=mfr_pn)
+    if date_from:
+        qs = qs.filter(invoice_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(invoice_date__lte=date_to)
+
+    first = qs.exclude(product_description='').values('product_description').first()
+    description = first['product_description'] if first else ''
+
+    qs_conv = _annotate_converted(qs, selected_currency, rates)
+    totals_raw = qs_conv.aggregate(
+        revenue=Sum('converted_value'),
+        units=Sum('quantity'),
+        records=Count('id'),
+        customers=Count('customer_name', distinct=True),
+    )
+    totals = {
+        'revenue':   float(totals_raw['revenue'] or 0),
+        'units':     int(totals_raw['units'] or 0),
+        'records':   int(totals_raw['records'] or 0),
+        'customers': int(totals_raw['customers'] or 0),
+    }
+
+    by_dist = list(
+        qs_conv.values('distributor__id', 'distributor__name', 'distributor__region')
+        .annotate(revenue=Sum('converted_value'), units=Sum('quantity'), records=Count('id'))
+        .order_by('-revenue')
+    )
+    dist_total = sum(float(d['revenue'] or 0) for d in by_dist) or 1
+    for d in by_dist:
+        d['revenue'] = float(d['revenue'] or 0)
+        d['share_pct'] = round(d['revenue'] / dist_total * 100, 1)
+        d['color'] = REGION_COLORS.get(d['distributor__region'], '#8205B4')
+
+    top_customers = list(
+        qs.exclude(customer_name='')
+        .values('customer_name', 'country')
+        .annotate(revenue=Sum('invoiced_value'), units=Sum('quantity'), records=Count('id'))
+        .order_by('-revenue')[:10]
+    )
+    for c in top_customers:
+        c['revenue'] = float(c['revenue'] or 0)
+        c['display_country'] = country_display(c['country'])
+
+    monthly_qs = list(
+        _annotate_converted(
+            qs.filter(invoice_date__isnull=False, invoiced_value__isnull=False),
+            selected_currency, rates
+        )
+        .annotate(month=TruncMonth('invoice_date'))
+        .values('month')
+        .annotate(revenue=Sum('converted_value'), units=Sum('quantity'))
+        .order_by('month')
+    )
+    chart_data = json.dumps({
+        'labels':  [r['month'].strftime('%b %Y') for r in monthly_qs],
+        'revenue': [float(r['revenue'] or 0) for r in monthly_qs],
+        'units':   [int(r['units'] or 0) for r in monthly_qs],
+    })
+
+    return render(request, 'reports/product_detail.html', {
+        'mfr_pn':      mfr_pn,
+        'description': description,
+        'totals':      totals,
+        'by_dist':     by_dist,
+        'top_customers': top_customers,
+        'chart_data':  chart_data,
+        'filters':     {'date_from': date_from, 'date_to': date_to},
+        'has_filters': bool(date_from or date_to),
+        'page_title':  description or mfr_pn,
+        'selected_currency': selected_currency,
+        'currency_symbol':   currency_symbol,
     })
 
 

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">
+      <a href="{% url 'product_list' %}" class="text-decoration-none me-2" style="color:#aaa;font-size:.9rem">
+        <i class="bi bi-chevron-left"></i> Products
+      </a>
+      {% if description %}{{ description }}{% else %}{{ mfr_pn }}{% endif %}
+    </h4>
+    <p class="text-muted small mb-0">{{ mfr_pn }}</p>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-2 align-items-end" method="get" id="pdFilterForm">
+      <input type="hidden" name="item" value="{{ mfr_pn }}">
+
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Period</label>
+        <div class="btn-group btn-group-sm" id="pdPeriodPresets">
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="pdDatePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="pdHiddenFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="pdHiddenTo"   value="{{ filters.date_to }}">
+          <input type="hidden" name="period"    id="pdHiddenPeriod" value="">
+        </div>
+      </div>
+
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
+        {% if has_filters %}
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'product_detail' %}?item={{ mfr_pn|urlencode }}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- KPI cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card text-center">
+      <div class="kpi-value text-revenue">{{ currency_symbol }}{{ totals.revenue|floatformat:0|intcomma }}</div>
+      <div class="kpi-label">Total Revenue</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card text-center">
+      <div class="kpi-value">{{ totals.units|intcomma }}</div>
+      <div class="kpi-label">Units Sold</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card text-center">
+      <div class="kpi-value">{{ by_dist|length }}</div>
+      <div class="kpi-label">Distributors</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card text-center">
+      <div class="kpi-value">{{ totals.customers }}</div>
+      <div class="kpi-label">Customers</div>
+    </div>
+  </div>
+</div>
+
+{% if chart_data != '{"labels": [], "revenue": [], "units": []}' %}
+<!-- Monthly revenue chart -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <h6 class="mb-3 fw-bold">Revenue by Month</h6>
+    <div style="position:relative;height:220px">
+      <canvas id="pdChart"></canvas>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+
+  <!-- By distributor -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom py-3 px-4">
+        <h6 class="mb-0 fw-bold">By Distributor</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Distributor</th>
+              <th class="text-uppercase small text-muted fw-semibold">Region</th>
+              <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in by_dist %}
+            <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_records' d.distributor__id %}'">
+              <td class="ps-4 py-3">
+                <div class="fw-semibold">{{ d.distributor__name }}</div>
+                <div style="background:rgba(130,0,180,0.12);border-radius:4px;height:4px;margin-top:4px;overflow:hidden">
+                  <div style="background:{{ d.color }};height:100%;width:{{ d.share_pct }}%"></div>
+                </div>
+              </td>
+              <td><span class="badge badge-region rounded-pill">{{ d.distributor__region|default:"—" }}</span></td>
+              <td class="text-end fw-bold text-revenue pe-4">{{ currency_symbol }}{{ d.revenue|floatformat:0|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted py-4">No distributor data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top customers -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom py-3 px-4">
+        <h6 class="mb-0 fw-bold">Top Customers</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Customer</th>
+              <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in top_customers %}
+            <tr>
+              <td class="ps-4 py-3">
+                <div class="fw-semibold text-truncate" style="max-width:220px">{{ c.customer_name }}</div>
+                {% if c.display_country %}<div class="text-muted small">{{ c.display_country }}</div>{% endif %}
+              </td>
+              <td class="text-end text-muted pe-4">{{ currency_symbol }}{{ c.revenue|floatformat:0|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2" class="text-center text-muted py-4">No customer data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  const hiddenFrom = document.getElementById('pdHiddenFrom').value;
+  const hiddenTo   = document.getElementById('pdHiddenTo').value;
+  const fp = flatpickr('#pdDatePicker', {
+    mode: 'range',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    onChange: function(selectedDates) {
+      document.getElementById('pdHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
+      document.getElementById('pdHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    }
+  });
+  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const activePeriod = urlParams.get('period') ||
+    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
+  if (activePeriod) {
+    const btn = document.querySelector('#pdPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
+    if (btn) btn.classList.add('active');
+  }
+
+  const today = new Date();
+  document.querySelectorAll('#pdPeriodPresets .period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#pdPeriodPresets .period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const p = this.dataset.period;
+      document.getElementById('pdHiddenPeriod').value = p;
+      let df = null, dt = null;
+      if (p === 'mtd') {
+        df = new Date(today.getFullYear(), today.getMonth(), 1); dt = today;
+      } else if (p === 'qtd') {
+        const qStart = Math.floor(today.getMonth() / 3) * 3;
+        df = new Date(today.getFullYear(), qStart, 1); dt = today;
+      } else if (p === 'ytd') {
+        df = new Date(today.getFullYear(), 0, 1); dt = today;
+      }
+      if (df && dt) {
+        fp.setDate([df, dt]);
+        document.getElementById('pdHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
+        document.getElementById('pdHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+      } else {
+        fp.clear();
+        document.getElementById('pdHiddenFrom').value = '';
+        document.getElementById('pdHiddenTo').value   = '';
+      }
+      document.getElementById('pdFilterForm').submit();
+    });
+  });
+})();
+
+{% if chart_data %}
+(function() {
+  const raw = {{ chart_data|safe }};
+  if (!raw.labels || !raw.labels.length) return;
+  const currSym = '{{ currency_symbol }}';
+  function fmtMoney(v) {
+    if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
+    return currSym + Math.round(v).toLocaleString();
+  }
+  new Chart(document.getElementById('pdChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: raw.labels,
+      datasets: [{
+        data: raw.revenue,
+        backgroundColor: 'rgba(130,0,180,0.75)',
+        borderRadius: 4,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtMoney(ctx.parsed.y) } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: {
+          grid: { color: 'rgba(128,128,128,0.1)' },
+          ticks: { callback: v => fmtMoney(v) }
+        }
+      }
+    }
+  });
+})();
+{% endif %}
+</script>
+{% endblock %}

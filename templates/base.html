@@ -9,7 +9,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   {% load static %}
   <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
-  <link href="{% static 'css/custom.css' %}?v=4" rel="stylesheet">
+  <link href="{% static 'css/custom.css' %}?v=5" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   {% block extra_head %}{% endblock %}
 </head>
@@ -36,6 +36,12 @@
           <a class="nav-link {% if request.resolver_match.url_name == 'distributor_list' %}active{% endif %}"
              href="{% url 'distributor_list' %}">
             <i class="bi bi-building me-1"></i>Distributors
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'product_detail' %}active{% endif %}"
+             href="{% url 'product_list' %}">
+            <i class="bi bi-box-seam me-1"></i>Products
           </a>
         </li>
         <li class="nav-item">
