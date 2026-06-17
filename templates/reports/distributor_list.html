@@ -178,6 +178,7 @@
       <thead>
         <tr>
           <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Distributor</th>
+          <th class="text-uppercase small text-muted fw-semibold">Account Manager</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Records</th>
           <th class="pe-4"></th>
@@ -188,6 +189,11 @@
         <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_records' d.pk %}'">
           <td class="ps-4 py-3">
             <div class="fw-semibold">{{ d.name }}</div>
+          </td>
+          <td class="text-muted small">
+            {% if d.salesperson_name %}
+              <i class="bi bi-person-badge me-1"></i>{{ d.salesperson_name }}
+            {% else %}—{% endif %}
           </td>
           <td class="text-end fw-bold text-revenue">
             {% if d.total_revenue %}{{ currency_symbol }}{{ d.total_revenue|floatformat:0|intcomma }}{% else %}—{% endif %}

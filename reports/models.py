@@ -9,6 +9,14 @@ class Distributor(models.Model):
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Priority ERP link (set manually in admin, synced by sync_priority command)
+    priority_customer_code = models.CharField(
+        max_length=50, blank=True,
+        help_text='Priority CUSTNAME code for this distributor (e.g. CDEV)',
+    )
+    salesperson_code = models.CharField(max_length=50, blank=True)
+    salesperson_name = models.CharField(max_length=200, blank=True)
+
     class Meta:
         ordering = ['name']
 
@@ -104,3 +112,33 @@ class MonthlyRate(models.Model):
 
     def __str__(self):
         return f"{self.currency} {self.year}-{self.month:02d}: 1 = ${self.rate_to_usd} / €{self.rate_to_eur}"
+
+
+class PrioritySalesperson(models.Model):
+    """Cached copy of Priority AGENTS — Kramer sales reps."""
+    agent_code = models.CharField(max_length=50, unique=True)
+    agent_name = models.CharField(max_length=200, blank=True)
+    synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['agent_name']
+
+    def __str__(self):
+        return f"{self.agent_code} — {self.agent_name}"
+
+
+class PriorityProduct(models.Model):
+    """Cached copy of Priority LOGPART — Kramer product catalog."""
+    part_number = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=500, blank=True)    # EPARTDES (English)
+    description_local = models.CharField(max_length=500, blank=True)  # PARTDES
+    family = models.CharField(max_length=100, blank=True)         # FAMILYNAME
+    family_description = models.CharField(max_length=200, blank=True)  # FAMILYDES
+    status = models.CharField(max_length=50, blank=True)          # STATDES (Active/Inactive)
+    synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['part_number']
+
+    def __str__(self):
+        return f"{self.part_number} — {self.description or self.description_local}"

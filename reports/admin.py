@@ -1,11 +1,31 @@
 from django.contrib import admin
-from .models import Distributor, POSUpload, POSRecord
+from .models import Distributor, POSUpload, POSRecord, PrioritySalesperson, PriorityProduct
 
 
 @admin.register(Distributor)
 class DistributorAdmin(admin.ModelAdmin):
-    list_display = ['name', 'code', 'country', 'created_at']
+    list_display = ['name', 'code', 'country', 'region', 'priority_customer_code', 'salesperson_name', 'created_at']
     prepopulated_fields = {'code': ('name',)}
+    fieldsets = [
+        (None, {'fields': ['name', 'code', 'country', 'region', 'notes']}),
+        ('Priority ERP', {'fields': ['priority_customer_code', 'salesperson_code', 'salesperson_name'],
+                          'description': 'Set priority_customer_code to the Priority CUSTNAME for this distributor, then run: python manage.py sync_priority --agents-only'}),
+    ]
+
+
+@admin.register(PrioritySalesperson)
+class PrioritySalespersonAdmin(admin.ModelAdmin):
+    list_display = ['agent_code', 'agent_name', 'synced_at']
+    search_fields = ['agent_code', 'agent_name']
+    readonly_fields = ['synced_at']
+
+
+@admin.register(PriorityProduct)
+class PriorityProductAdmin(admin.ModelAdmin):
+    list_display = ['part_number', 'description', 'family', 'status', 'synced_at']
+    search_fields = ['part_number', 'description']
+    list_filter = ['status', 'family']
+    readonly_fields = ['synced_at']
 
 
 @admin.register(POSUpload)

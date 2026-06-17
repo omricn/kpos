@@ -11,7 +11,7 @@ from django.db.models.functions import TruncMonth, TruncWeek
 from django.http import HttpResponse
 from django.utils import timezone
 
-from .models import Distributor, POSUpload, POSRecord, ExchangeRate
+from .models import Distributor, POSUpload, POSRecord, ExchangeRate, PriorityProduct
 from .forms import UploadForm
 from .parsers import get_parser
 
@@ -488,6 +488,8 @@ def distributor_records(request, pk):
             'upload': upload_id,
         },
         'page_title': distributor.name,
+        'salesperson_code': distributor.salesperson_code,
+        'salesperson_name': distributor.salesperson_name,
     }
     return render(request, 'reports/records.html', context)
 
@@ -650,7 +652,8 @@ def distributor_list(request):
 
     dist_data = list(
         _annotate_converted(qs, selected_currency, rates)
-        .values('distributor__id', 'distributor__name', 'distributor__region')
+        .values('distributor__id', 'distributor__name', 'distributor__region',
+                'distributor__salesperson_name', 'distributor__salesperson_code')
         .annotate(revenue=Sum('converted_value'), units=Sum('quantity'), records=Count('id'))
         .order_by('-revenue')
     )
@@ -664,6 +667,8 @@ def distributor_list(request):
         d['name'] = d['distributor__name']
         d['total_revenue'] = d['revenue']
         d['total_records'] = d['records']
+        d['salesperson_name'] = d['distributor__salesperson_name']
+        d['salesperson_code'] = d['distributor__salesperson_code']
 
     top3 = dist_data[:3]
 
@@ -763,8 +768,17 @@ def product_detail(request):
     if date_to:
         qs = qs.filter(invoice_date__lte=date_to)
 
-    first = qs.exclude(product_description='').values('product_description').first()
-    description = first['product_description'] if first else ''
+    # Prefer Priority canonical English name; fall back to distributor description
+    priority_product = PriorityProduct.objects.filter(part_number=mfr_pn).first()
+    if priority_product and priority_product.description:
+        description = priority_product.description
+        priority_family = priority_product.family_description or priority_product.family
+        priority_status = priority_product.status
+    else:
+        first = qs.exclude(product_description='').values('product_description').first()
+        description = first['product_description'] if first else ''
+        priority_family = ''
+        priority_status = ''
 
     qs_conv = _annotate_converted(qs, selected_currency, rates)
     totals_raw = qs_conv.aggregate(
@@ -818,15 +832,17 @@ def product_detail(request):
     })
 
     return render(request, 'reports/product_detail.html', {
-        'mfr_pn':      mfr_pn,
-        'description': description,
-        'totals':      totals,
-        'by_dist':     by_dist,
-        'top_customers': top_customers,
-        'chart_data':  chart_data,
-        'filters':     {'date_from': date_from, 'date_to': date_to},
-        'has_filters': bool(date_from or date_to),
-        'page_title':  description or mfr_pn,
+        'mfr_pn':         mfr_pn,
+        'description':    description,
+        'priority_family': priority_family,
+        'priority_status': priority_status,
+        'totals':         totals,
+        'by_dist':        by_dist,
+        'top_customers':  top_customers,
+        'chart_data':     chart_data,
+        'filters':        {'date_from': date_from, 'date_to': date_to},
+        'has_filters':    bool(date_from or date_to),
+        'page_title':     description or mfr_pn,
         'selected_currency': selected_currency,
         'currency_symbol':   currency_symbol,
     })

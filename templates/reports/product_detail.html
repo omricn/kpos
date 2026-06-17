@@ -16,7 +16,11 @@
       </a>
       {% if description %}{{ description }}{% else %}{{ mfr_pn }}{% endif %}
     </h4>
-    <p class="text-muted small mb-0">{{ mfr_pn }}</p>
+    <p class="text-muted small mb-0">
+      {{ mfr_pn }}
+      {% if priority_family %}<span class="badge bg-light text-secondary border ms-2">{{ priority_family }}</span>{% endif %}
+      {% if priority_status == 'Inactive' %}<span class="badge bg-warning text-dark ms-1">Discontinued</span>{% endif %}
+    </p>
   </div>
 </div>
 

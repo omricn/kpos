@@ -1,0 +1,163 @@
+{
+  "info": {
+    "name": "KPos → Priority API",
+    "description": "Calls KPos needs from Priority OData API. Auth: Basic — username=API key, password=PAT. Please enable API access for any call returning 400.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      { "key": "username", "value": "2B643D1E29D644BFAF00760B5336F405", "type": "string" },
+      { "key": "password", "value": "PAT", "type": "string" }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api22.kramerav.com/odata/Priority/tabula.ini/krmel",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Service Root (auth check)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": [""]
+        },
+        "description": "Confirms authentication works. Should return list of all available entity sets. Currently returns HTTP 200."
+      }
+    },
+    {
+      "name": "2. LOGPART — Product Catalog [WORKING]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/LOGPART?$top=10&$select=PARTNAME,PARTDES,EPARTDES,FAMILYNAME,FAMILYDES,STATDES,TYPE",
+          "host": ["{{base_url}}"],
+          "path": ["LOGPART"],
+          "query": [
+            { "key": "$top", "value": "10" },
+            { "key": "$select", "value": "PARTNAME,PARTDES,EPARTDES,FAMILYNAME,FAMILYDES,STATDES,TYPE" }
+          ]
+        },
+        "description": "Kramer product catalog. PARTNAME = Kramer part number, PARTDES/EPARTDES = product name. Used to enrich KPos product pages with canonical names. Currently returns HTTP 200."
+      }
+    },
+    {
+      "name": "3. LOGPART — Lookup single part number [WORKING]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/LOGPART('50-80022090')?$select=PARTNAME,PARTDES,EPARTDES,FAMILYNAME,FAMILYDES,STATDES",
+          "host": ["{{base_url}}"],
+          "path": ["LOGPART('50-80022090')"],
+          "query": [
+            { "key": "$select", "value": "PARTNAME,PARTDES,EPARTDES,FAMILYNAME,FAMILYDES,STATDES" }
+          ]
+        },
+        "description": "Lookup a single Kramer part by part number. Used to cross-reference a specific part from a distributor report. Currently returns HTTP 200."
+      }
+    },
+    {
+      "name": "4. CUSTOMERS — Distributor list [NEEDS PERMISSION]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/CUSTOMERS?$top=10&$select=CUSTNAME,CDES,AGENTCODE,AGENTNAME,WTAXCODE,STATDES",
+          "host": ["{{base_url}}"],
+          "path": ["CUSTOMERS"],
+          "query": [
+            { "key": "$top", "value": "10" },
+            { "key": "$select", "value": "CUSTNAME,CDES,AGENTCODE,AGENTNAME,WTAXCODE,STATDES" }
+          ]
+        },
+        "description": "List of customers/distributors. AGENTCODE/AGENTNAME = the assigned salesperson for that distributor. Used to map each KPos distributor to its dedicated sales rep. Currently returns HTTP 400 — needs API access enabled."
+      }
+    },
+    {
+      "name": "5. CUSTOMERS — Lookup single distributor [NEEDS PERMISSION]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/CUSTOMERS('CDEV')?$select=CUSTNAME,CDES,AGENTCODE,AGENTNAME",
+          "host": ["{{base_url}}"],
+          "path": ["CUSTOMERS('CDEV')"],
+          "query": [
+            { "key": "$select", "value": "CUSTNAME,CDES,AGENTCODE,AGENTNAME" }
+          ]
+        },
+        "description": "Lookup a single distributor by customer code to get their assigned salesperson. Currently returns HTTP 400 — needs API access enabled."
+      }
+    },
+    {
+      "name": "6. AGENTS — Salesperson directory [NEEDS PERMISSION]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/AGENTS?$top=50&$select=AGENTCODE,AGENTNAME",
+          "host": ["{{base_url}}"],
+          "path": ["AGENTS"],
+          "query": [
+            { "key": "$top", "value": "50" },
+            { "key": "$select", "value": "AGENTCODE,AGENTNAME" }
+          ]
+        },
+        "description": "Full list of sales agents/reps. Used to populate the salesperson directory in KPos. Currently returns HTTP 400 — needs API access enabled."
+      }
+    },
+    {
+      "name": "7. AINVOICES — Invoice headers [WORKING]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/AINVOICES?$top=10&$select=IVNUM,IVDATE,CUSTNAME,CDES,ORDNAME,AGENTCODE,AGENTNAME,TOTPRICE,CODE&$orderby=IVDATE desc",
+          "host": ["{{base_url}}"],
+          "path": ["AINVOICES"],
+          "query": [
+            { "key": "$top", "value": "10" },
+            { "key": "$select", "value": "IVNUM,IVDATE,CUSTNAME,CDES,ORDNAME,AGENTCODE,AGENTNAME,TOTPRICE,CODE" },
+            { "key": "$orderby", "value": "IVDATE desc" }
+          ]
+        },
+        "description": "Invoice headers. AGENTCODE/AGENTNAME = salesperson on the invoice. ORDNAME = linked order number. Used to cross-reference distributor reports with Priority invoices. Currently returns HTTP 200."
+      }
+    },
+    {
+      "name": "8. AINVOICES — Line items via expand [NEEDS PERMISSION]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/AINVOICES?$top=5&$select=IVNUM,IVDATE,CUSTNAME,AGENTCODE&$expand=AINVOICEITEMS_SUBFORM($select=PARTNAME,PDES,QUANT,PRICE,DISPRICE)&$orderby=IVDATE desc",
+          "host": ["{{base_url}}"],
+          "path": ["AINVOICES"],
+          "query": [
+            { "key": "$top", "value": "5" },
+            { "key": "$select", "value": "IVNUM,IVDATE,CUSTNAME,AGENTCODE" },
+            { "key": "$expand", "value": "AINVOICEITEMS_SUBFORM($select=PARTNAME,PDES,QUANT,PRICE,DISPRICE)" },
+            { "key": "$orderby", "value": "IVDATE desc" }
+          ]
+        },
+        "description": "Invoice headers with line items expanded. AINVOICEITEMS_SUBFORM contains PARTNAME (Kramer part number), quantity, and price per line. Used to match distributor report line items to Priority invoices. Currently returns HTTP 400 — needs API access enabled for AINVOICEITEMS_SUBFORM."
+      }
+    },
+    {
+      "name": "9. AINVOICES — Single invoice with line items [NEEDS PERMISSION]",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/AINVOICES(IVNUM='T11461',IVTYPE='A',DEBIT='D')/AINVOICEITEMS_SUBFORM?$select=PARTNAME,PDES,QUANT,PRICE",
+          "host": ["{{base_url}}"],
+          "path": ["AINVOICES(IVNUM='T11461',IVTYPE='A',DEBIT='D')", "AINVOICEITEMS_SUBFORM"],
+          "query": [
+            { "key": "$select", "value": "PARTNAME,PDES,QUANT,PRICE" }
+          ]
+        },
+        "description": "Line items for a specific invoice (composite key: IVNUM, IVTYPE, DEBIT). Returns the Kramer part numbers and quantities on that invoice. Currently returns HTTP 400 — needs API access enabled for AINVOICEITEMS_SUBFORM."
+      }
+    }
+  ]
+}
