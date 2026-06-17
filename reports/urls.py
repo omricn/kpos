@@ -14,4 +14,5 @@ urlpatterns = [
     path('products/', views.product_list, name='product_list'),
     path('products/detail/', views.product_detail, name='product_detail'),
     path('set-currency/', views.set_currency, name='set_currency'),
+    path('salespersons/', views.salesperson_list, name='salesperson_list'),
 ]

@@ -69,12 +69,23 @@
         </div>
       </div>
 
+      <!-- Account Manager filter -->
+      <div class="col-auto">
+        <label class="filter-label">Account Manager</label>
+        <select class="form-select filter-input" name="salesperson" style="min-width:180px">
+          <option value="">All Managers</option>
+          {% for sp in all_salespersons %}
+          <option value="{{ sp }}" {% if selected_sp == sp %}selected{% endif %}>{{ sp }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
       <!-- Apply / Clear -->
       <div class="col-auto d-flex gap-2 align-items-end">
         <button class="btn btn-kramer filter-btn px-4" type="submit">
           <i class="bi bi-funnel-fill me-1"></i>Apply
         </button>
-        {% if filters.date_from or filters.date_to %}
+        {% if has_filters %}
         <a class="btn btn-outline-secondary filter-btn" href="{% url 'distributor_list' %}{% if selected_region %}?region={{ selected_region|urlencode }}{% endif %}">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>

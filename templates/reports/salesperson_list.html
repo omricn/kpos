@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <a href="{% url 'dashboard' %}" class="text-decoration-none text-muted small">
+      <i class="bi bi-chevron-left me-1"></i>Dashboard
+    </a>
+    <h4 class="mb-1 fw-bold mt-1">Account Managers</h4>
+    <p class="text-muted small mb-0">Distributor revenue by account manager — all figures in {{ selected_currency }}</p>
+  </div>
+  <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
+    <i class="bi bi-cloud-upload me-1"></i>Upload
+  </a>
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-3 align-items-end" method="get" id="spFilterForm">
+
+      <!-- Period presets -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Period</label>
+        <div class="btn-group btn-group-sm" id="spPeriodPresets">
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
+        </div>
+      </div>
+
+      <!-- Date range -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="spDatePicker" class="form-control filter-input date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="spHiddenFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="spHiddenTo"   value="{{ filters.date_to }}">
+          <input type="hidden" name="period"    id="spHiddenPeriod" value="">
+        </div>
+      </div>
+
+      <!-- Account Manager -->
+      <div class="col-auto">
+        <label class="filter-label">Account Manager</label>
+        <select class="form-select filter-input" name="salesperson" style="min-width:180px">
+          <option value="">All Managers</option>
+          {% for sp in all_salespersons %}
+          <option value="{{ sp }}" {% if selected_sp == sp %}selected{% endif %}>{{ sp }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Apply / Clear -->
+      <div class="col-auto d-flex gap-2 align-items-end">
+        <button class="btn btn-kramer filter-btn px-4" type="submit">
+          <i class="bi bi-funnel-fill me-1"></i>Apply
+        </button>
+        {% if has_filters %}
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'salesperson_list' %}">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- Top-3 Podium -->
+{% if top3 %}
+<div class="row g-3 mb-4 justify-content-center">
+  {% for sp in top3 %}
+  <div class="col-12 col-md-4">
+    <a href="{% url 'distributor_list' %}?salesperson={{ sp.name|urlencode }}" class="text-decoration-none">
+      <div class="card border-0 shadow-sm h-100" style="border-top:4px solid {% if forloop.counter == 1 %}#FCD34D{% elif forloop.counter == 2 %}#9CA3AF{% else %}#D97706{% endif %} !important">
+        <div class="card-body p-4 text-center">
+          <div class="mb-2" style="font-size:2rem">
+            {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}
+          </div>
+          <div class="fw-bold fs-5 mb-1">{{ sp.name }}</div>
+          <div class="fw-bold mb-1" style="color:var(--revenue-color);font-size:1.3rem">{{ currency_symbol }}{{ sp.revenue|floatformat:0|intcomma }}</div>
+          <div class="text-muted small">{{ sp.dist_count }} distributor{{ sp.dist_count|pluralize }} · {{ sp.share_pct }}% of total</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Horizontal bar chart -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <h6 class="mb-3 fw-bold">Revenue by Account Manager (Top 10)</h6>
+    <div style="position:relative;height:{% if sp_data|length > 5 %}340px{% else %}220px{% endif %}">
+      <canvas id="spChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Full table -->
+{% if sp_data %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
+    <h6 class="mb-0 fw-bold">All Account Managers ({{ sp_data|length }})</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr style="background:var(--bg-elevated)">
+          <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">#</th>
+          <th class="text-uppercase small text-muted fw-semibold">Account Manager</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Distributors</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
+          <th class="text-uppercase small text-muted fw-semibold" style="min-width:120px">% Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sp in sp_data %}
+        <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_list' %}?salesperson={{ sp.name|urlencode }}'">
+          <td class="ps-4 text-muted small">{{ forloop.counter }}</td>
+          <td>
+            <a href="{% url 'distributor_list' %}?salesperson={{ sp.name|urlencode }}" class="fw-semibold text-decoration-none">
+              <i class="bi bi-person-badge me-1" style="color:var(--kramer-purple)"></i>{{ sp.name }}
+            </a>
+          </td>
+          <td class="text-end">
+            <span class="badge rounded-pill" style="background:rgba(130,5,180,0.12);color:var(--kramer-purple)">{{ sp.dist_count }}</span>
+          </td>
+          <td class="text-end fw-bold text-revenue">{{ currency_symbol }}{{ sp.revenue|floatformat:0|intcomma }}</td>
+          <td class="text-end text-muted">{{ sp.units|intcomma }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="dist-share-track flex-grow-1">
+                <div class="dist-share-fill" style="width:{{ sp.share_pct }}%"></div>
+              </div>
+              <span class="text-muted small" style="min-width:38px">{{ sp.share_pct }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+  <i class="bi bi-person-badge display-1 text-muted"></i>
+  <p class="mt-3 text-muted">No account manager data found.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const spChartData = {{ chart_data|safe }};
+const currSym = '{{ currency_symbol }}';
+function fmtMoney(v) {
+  if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
+  return currSym + Math.round(v).toLocaleString();
+}
+const isDark = () => document.documentElement.getAttribute('data-bs-theme') === 'dark';
+const purple = '#8205B4';
+
+const spCtx = document.getElementById('spChart').getContext('2d');
+const spChart = new Chart(spCtx, {
+  type: 'bar',
+  data: {
+    labels: spChartData.labels,
+    datasets: [{
+      label: 'Revenue ({{ selected_currency }})',
+      data: spChartData.revenue,
+      backgroundColor: purple + 'cc',
+      borderColor: purple,
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: { label: ctx => ' ' + fmtMoney(ctx.raw) }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: isDark() ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
+        ticks: { color: isDark() ? '#636366' : '#666', callback: v => fmtMoney(v) }
+      },
+      y: {
+        grid: { display: false },
+        ticks: { color: isDark() ? '#DCDDDE' : '#333', font: { size: 12 } }
+      }
+    }
+  }
+});
+
+window.onThemeChange = function() {
+  const dark = isDark();
+  spChart.options.scales.x.grid.color = dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+  spChart.options.scales.x.ticks.color = dark ? '#636366' : '#666';
+  spChart.options.scales.y.ticks.color = dark ? '#DCDDDE' : '#333';
+  spChart.update('none');
+};
+
+// Flatpickr
+(function() {
+  const hiddenFrom = document.getElementById('spHiddenFrom').value;
+  const hiddenTo   = document.getElementById('spHiddenTo').value;
+  const fp = flatpickr('#spDatePicker', {
+    mode: 'range',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    onChange: function(selectedDates) {
+      document.getElementById('spHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
+      document.getElementById('spHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    }
+  });
+  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+
+  const today = new Date();
+  const urlParams = new URLSearchParams(window.location.search);
+  const activePeriod = urlParams.get('period') ||
+    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
+  if (activePeriod) {
+    const activeBtn = document.querySelector('#spPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+
+  document.querySelectorAll('#spPeriodPresets .period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#spPeriodPresets .period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const p = this.dataset.period;
+      document.getElementById('spHiddenPeriod').value = p;
+      let df = null, dt = null;
+      if (p === 'mtd') {
+        df = new Date(today.getFullYear(), today.getMonth(), 1); dt = today;
+      } else if (p === 'qtd') {
+        const qStart = Math.floor(today.getMonth() / 3) * 3;
+        df = new Date(today.getFullYear(), qStart, 1); dt = today;
+      } else if (p === 'ytd') {
+        df = new Date(today.getFullYear(), 0, 1); dt = today;
+      }
+      if (df && dt) {
+        fp.setDate([df, dt]);
+        document.getElementById('spHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
+        document.getElementById('spHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+      } else {
+        fp.clear();
+        document.getElementById('spHiddenFrom').value = '';
+        document.getElementById('spHiddenTo').value   = '';
+      }
+      document.getElementById('spFilterForm').submit();
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -388,6 +388,20 @@ def dashboard(request):
             p['revenue'] = float(p['revenue'] or 0)
             p['pct'] = round(p['revenue'] / max_rev * 100)
 
+    # Top 5 account managers
+    top_salespersons = list(
+        _annotate_converted(
+            qs.exclude(distributor__salesperson_name='').filter(invoiced_value__isnull=False),
+            selected_currency, rates
+        )
+        .values('distributor__salesperson_name', 'distributor__salesperson_code')
+        .annotate(revenue=Sum('converted_value'), units=Sum('quantity'), dist_count=Count('distributor', distinct=True))
+        .order_by('-revenue')[:5]
+    )
+    for sp in top_salespersons:
+        sp['revenue'] = float(sp['revenue'] or 0)
+        sp['units'] = int(sp['units'] or 0)
+
     # Per-distributor summary table
     dist_summary = list(
         _annotate_converted(qs, selected_currency, rates)
@@ -437,7 +451,8 @@ def dashboard(request):
             'region':       region,
             'distributor':  distributor_id,
         },
-        'top_products':   top_products,
+        'top_products':      top_products,
+        'top_salespersons':  top_salespersons,
         'region_cards':   region_cards,
         'page_title':     'Revenue Dashboard',
         'has_filters':    any([date_from, date_to, region, distributor_id]),
@@ -627,6 +642,7 @@ def distributor_list(request):
     selected_region = request.GET.get('region', '').strip()
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()
+    selected_sp = request.GET.get('salesperson', '').strip()
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
@@ -670,6 +686,8 @@ def distributor_list(request):
     qs = POSRecord.objects.filter(invoiced_value__isnull=False)
     if selected_region:
         qs = qs.filter(distributor__region=selected_region)
+    if selected_sp:
+        qs = qs.filter(distributor__salesperson_name=selected_sp)
     if date_from:
         qs = qs.filter(invoice_date__gte=date_from)
     if date_to:
@@ -711,6 +729,13 @@ def distributor_list(request):
 
     region_info = next((r for r in region_stats if r['name'] == selected_region), None)
 
+    all_salespersons = list(
+        Distributor.objects.exclude(salesperson_name='')
+        .values_list('salesperson_name', flat=True)
+        .distinct()
+        .order_by('salesperson_name')
+    )
+
     return render(request, 'reports/distributor_list.html', {
         'all_distributors': all_distributors,
         'region_stats': region_stats,
@@ -720,12 +745,14 @@ def distributor_list(request):
         'dist_data': dist_data,
         'top3': top3,
         'chart_data': chart_data,
-        'has_filters': bool(selected_region or date_from or date_to),
-        'filters': {'date_from': date_from, 'date_to': date_to, 'region': selected_region},
+        'has_filters': bool(selected_region or date_from or date_to or selected_sp),
+        'filters': {'date_from': date_from, 'date_to': date_to, 'region': selected_region, 'salesperson': selected_sp},
         'jump_distributors': jump_distributors,
         'page_title': 'Distributors',
         'selected_currency': selected_currency,
         'currency_symbol': currency_symbol,
+        'selected_sp': selected_sp,
+        'all_salespersons': all_salespersons,
     })
 
 
@@ -1128,6 +1155,71 @@ def revenue_view(request):
         'page_title': 'Total Revenue',
         'selected_currency': selected_currency,
         'currency_symbol': currency_symbol,
+    })
+
+
+def salesperson_list(request):
+    date_from = request.GET.get('date_from', '').strip()
+    date_to   = request.GET.get('date_to', '').strip()
+    selected_sp = request.GET.get('salesperson', '').strip()
+
+    selected_currency = request.session.get('currency', 'USD')
+    currency_symbol = _currency_symbol(selected_currency)
+    rates = _get_rates()
+
+    qs = POSRecord.objects.filter(invoiced_value__isnull=False).exclude(distributor__salesperson_name='')
+    if date_from:
+        qs = qs.filter(invoice_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(invoice_date__lte=date_to)
+    if selected_sp:
+        qs = qs.filter(distributor__salesperson_name=selected_sp)
+
+    sp_data = list(
+        _annotate_converted(qs, selected_currency, rates)
+        .values('distributor__salesperson_name', 'distributor__salesperson_code')
+        .annotate(
+            revenue=Sum('converted_value'),
+            units=Sum('quantity'),
+            dist_count=Count('distributor', distinct=True),
+            records=Count('id'),
+        )
+        .order_by('-revenue')
+    )
+    total_rev = sum(float(s['revenue'] or 0) for s in sp_data) or 1
+    for s in sp_data:
+        s['revenue'] = float(s['revenue'] or 0)
+        s['units'] = int(s['units'] or 0)
+        s['share_pct'] = round(s['revenue'] / total_rev * 100, 1)
+        s['name'] = s['distributor__salesperson_name']
+        s['code'] = s['distributor__salesperson_code']
+
+    top3 = sp_data[:3]
+
+    chart_items = sp_data[:10]
+    chart_data = json.dumps({
+        'labels':  [s['name'] for s in chart_items],
+        'revenue': [s['revenue'] for s in chart_items],
+    })
+
+    all_salespersons = list(
+        Distributor.objects.exclude(salesperson_name='')
+        .values_list('salesperson_name', flat=True)
+        .distinct()
+        .order_by('salesperson_name')
+    )
+
+    return render(request, 'reports/salesperson_list.html', {
+        'sp_data':         sp_data,
+        'top3':            top3,
+        'chart_data':      chart_data,
+        'all_salespersons': all_salespersons,
+        'selected_sp':     selected_sp,
+        'has_filters':     bool(date_from or date_to or selected_sp),
+        'filters':         {'date_from': date_from, 'date_to': date_to},
+        'page_title':      'Account Managers',
+        'selected_currency': selected_currency,
+        'currency_symbol':   currency_symbol,
     })
 
 
