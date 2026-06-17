@@ -6,12 +6,13 @@ from datetime import date as date_cls, timedelta
 from datetime import datetime as dt_class
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.db.models import Sum, Count, Min, Max, Q, Case, When, F, DecimalField, ExpressionWrapper, Value
-from django.db.models.functions import TruncMonth, TruncWeek
+from django.db.models import Sum, Count, Min, Max, Q, Case, When, F, DecimalField, ExpressionWrapper, Value, Subquery, OuterRef
+from django.db.models.functions import TruncMonth, TruncWeek, ExtractYear, ExtractMonth
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils import timezone
 
-from .models import Distributor, POSUpload, POSRecord, ExchangeRate, PriorityProduct
+from .models import Distributor, POSUpload, POSRecord, ExchangeRate, MonthlyRate, PriorityProduct
 from .forms import UploadForm
 from .parsers import get_parser
 
@@ -63,23 +64,41 @@ def _get_rates():
             for r in ExchangeRate.objects.all()}
 
 
-def _annotate_converted(qs, target, rates):
-    """Annotate queryset with converted_value using Case/When for each currency."""
-    whens = []
-    for currency, r in rates.items():
-        rate = r['usd'] if target == 'USD' else r['eur']
-        whens.append(When(
-            currency=currency,
-            then=ExpressionWrapper(
-                F('invoiced_value') * Value(rate, output_field=DecimalField()),
+def _annotate_converted(qs, target, rates=None):
+    """Annotate queryset with converted_value using historical monthly rates.
+
+    Looks up MonthlyRate for each record's (year, month, currency); falls back
+    to current ExchangeRate if no historical rate exists for that period.
+    The `rates` param is kept for backward compatibility but is no longer used.
+    """
+    rate_field = 'rate_to_usd' if target == 'USD' else 'rate_to_eur'
+
+    monthly_subq = MonthlyRate.objects.filter(
+        year=ExtractYear(OuterRef('invoice_date')),
+        month=ExtractMonth(OuterRef('invoice_date')),
+        currency=OuterRef('currency'),
+    ).values(rate_field)[:1]
+
+    current_subq = ExchangeRate.objects.filter(
+        currency=OuterRef('currency'),
+    ).values(rate_field)[:1]
+
+    return (
+        qs
+        .annotate(
+            _hist_rate=Subquery(monthly_subq, output_field=DecimalField(max_digits=12, decimal_places=6)),
+            _curr_rate=Subquery(current_subq, output_field=DecimalField(max_digits=12, decimal_places=6)),
+        )
+        .annotate(
+            converted_value=ExpressionWrapper(
+                F('invoiced_value') * Coalesce(
+                    F('_hist_rate'), F('_curr_rate'), Value(Decimal('1')),
+                    output_field=DecimalField(max_digits=12, decimal_places=6),
+                ),
                 output_field=DecimalField(max_digits=15, decimal_places=4),
             )
-        ))
-    return qs.annotate(converted_value=Case(
-        *whens,
-        default=F('invoiced_value'),
-        output_field=DecimalField(max_digits=15, decimal_places=4),
-    ))
+        )
+    )
 
 
 def _currency_symbol(currency):
@@ -538,6 +557,12 @@ def upload_file(request):
             ]
             POSRecord.objects.bulk_create(bulk_records)
 
+            try:
+                from django.core.management import call_command
+                call_command('update_monthly_rates', verbosity=0)
+            except Exception:
+                pass
+
             messages.success(request, f'Successfully imported {len(parsed_rows)} records from "{excel_file.name}".')
             return redirect('distributor_records', pk=distributor.pk)
     else:
@@ -663,6 +688,7 @@ def distributor_list(request):
         d['units'] = int(d['units'] or 0)
         d['share_pct'] = round(d['revenue'] / total_rev * 100, 1)
         d['color'] = REGION_COLORS.get(d['distributor__region'], '#8205B4')
+        # Template-friendly aliases (template uses d.pk, d.name, d.total_revenue, d.total_records)
         d['pk'] = d['distributor__id']
         d['name'] = d['distributor__name']
         d['total_revenue'] = d['revenue']
