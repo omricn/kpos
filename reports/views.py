@@ -398,9 +398,17 @@ def dashboard(request):
         .annotate(revenue=Sum('converted_value'), units=Sum('quantity'), dist_count=Count('distributor', distinct=True))
         .order_by('-revenue')[:5]
     )
-    for sp in top_salespersons:
-        sp['revenue'] = float(sp['revenue'] or 0)
-        sp['units'] = int(sp['units'] or 0)
+    if top_salespersons:
+        max_sp_rev = float(max(sp['revenue'] for sp in top_salespersons) or 1)
+        for sp in top_salespersons:
+            sp['revenue'] = float(sp['revenue'] or 0)
+            sp['units'] = int(sp['units'] or 0)
+            sp['pct'] = round(sp['revenue'] / max_sp_rev * 100)
+    else:
+        for sp in top_salespersons:
+            sp['revenue'] = float(sp['revenue'] or 0)
+            sp['units'] = int(sp['units'] or 0)
+            sp['pct'] = 0
 
     # Per-distributor summary table
     dist_summary = list(

@@ -13,12 +13,9 @@
     <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#topProductsPanel">
       <i class="bi bi-trophy me-1"></i>Top Products
     </button>
-    <a href="{% url 'distributor_list' %}" class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-table me-1"></i>Browse Data
-    </a>
-    <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
-      <i class="bi bi-cloud-upload me-1"></i>Upload
-    </a>
+    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#topManagersPanel">
+      <i class="bi bi-person-badge me-1"></i>Top Account Managers
+    </button>
   </div>
 </div>
 
@@ -39,7 +36,8 @@
       <div class="d-flex align-items-center gap-3">
         <div class="product-rank-num {% if forloop.counter <= 3 %}top3{% endif %}">{{ forloop.counter }}</div>
         <div class="flex-grow-1" style="min-width:0">
-          <div class="fw-semibold text-truncate" style="color:#1a1a2e;font-size:.88rem" title="{{ p.product_name }}">{{ p.product_name }}</div>
+          <div class="fw-semibold text-truncate" style="color:#1a1a2e;font-size:.88rem" title="{% if p.description %}{{ p.description }}{% else %}{{ p.manufacturer_part_no }}{% endif %}">{% if p.description %}{{ p.description }}{% else %}{{ p.manufacturer_part_no }}{% endif %}</div>
+          <div class="text-muted text-truncate" style="font-size:.75rem">{{ p.manufacturer_part_no }}</div>
           <div class="d-flex align-items-center gap-2 mt-1">
             <div class="product-rank-bar-track flex-grow-1">
               <div class="product-rank-bar-fill" style="width:{{ p.pct }}%"></div>
@@ -55,8 +53,46 @@
       <i class="bi bi-inbox display-4 d-block mb-2"></i>No data available.
     </div>
     {% endfor %}
+  </div>
+</div>
+
+<!-- Top Account Managers slide panel -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="topManagersPanel" style="width:420px;max-width:100vw">
+  <div class="offcanvas-header border-0 pb-2" style="background:linear-gradient(135deg,var(--kramer-purple) 0%,var(--kramer-purple-light) 100%)">
+    <div>
+      <h5 class="offcanvas-title mb-0 fw-bold text-white">
+        <i class="bi bi-person-badge-fill me-2" style="color:#FCD34D"></i>Top Account Managers
+      </h5>
+      <p class="mb-0 small text-white-50">By revenue — matches current filters</p>
+    </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body p-0">
+    {% for sp in top_salespersons %}
+    <div class="product-rank-item px-4 py-3" style="cursor:pointer" onclick="window.location='{% url 'distributor_list' %}?salesperson={{ sp.distributor__salesperson_name|urlencode }}'">
+      <div class="d-flex align-items-center gap-3">
+        <div class="product-rank-num {% if forloop.counter <= 3 %}top3{% endif %}">{{ forloop.counter }}</div>
+        <div class="flex-grow-1" style="min-width:0">
+          <div class="fw-semibold text-truncate" style="color:#1a1a2e;font-size:.88rem">{{ sp.distributor__salesperson_name }}</div>
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <div class="product-rank-bar-track flex-grow-1">
+              <div class="product-rank-bar-fill" style="width:{{ sp.pct }}%"></div>
+            </div>
+            <span class="text-muted" style="font-size:.75rem;white-space:nowrap">{{ sp.dist_count }} dist.</span>
+          </div>
+        </div>
+        <div class="fw-bold" style="color:#16a34a;font-size:.92rem;white-space:nowrap">{{ currency_symbol }}{{ sp.revenue|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-inbox display-4 d-block mb-2"></i>No data available.
+    </div>
+    {% endfor %}
     <div class="px-4 py-3 border-top" style="background:#fafafa">
-      <p class="text-muted small mb-0"><i class="bi bi-clock-history me-1"></i>More rankings coming soon — sales rep leaderboard</p>
+      <a href="{% url 'salesperson_list' %}" class="text-decoration-none small" style="color:var(--kramer-purple)">
+        <i class="bi bi-arrow-right me-1"></i>View full Account Managers page
+      </a>
     </div>
   </div>
 </div>
@@ -200,89 +236,6 @@
   </div>
 </div>
 
-<!-- Top Products + Top Account Managers (side by side) -->
-<div class="row g-4 mb-4">
-
-{% if top_products %}
-<div class="col-lg-6">
-  <div class="card border-0 shadow-sm h-100">
-    <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
-      <h6 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2" style="color:var(--kramer-purple)"></i>Top Products</h6>
-      <a href="{% url 'product_list' %}{% if filters.date_from or filters.date_to %}?date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% endif %}" class="btn btn-sm btn-outline-secondary">
-        View all <i class="bi bi-arrow-right ms-1"></i>
-      </a>
-    </div>
-    <div class="card-body p-0">
-      <table class="table table-hover mb-0 align-middle">
-        <thead>
-          <tr>
-            <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Item</th>
-            <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
-            <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
-            <th class="pe-4" style="min-width:120px"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in top_products %}
-          <tr style="cursor:pointer" onclick="window.location='{% url 'product_detail' %}?item={{ p.manufacturer_part_no|urlencode }}'">
-            <td class="ps-4 py-3">
-              <div class="fw-semibold">{% if p.description %}{{ p.description }}{% else %}{{ p.manufacturer_part_no }}{% endif %}</div>
-              <div class="text-muted small">{{ p.manufacturer_part_no }}</div>
-            </td>
-            <td class="text-end fw-bold text-revenue">{{ currency_symbol }}{{ p.revenue|floatformat:0|intcomma }}</td>
-            <td class="text-end text-muted">{{ p.units|intcomma }}</td>
-            <td class="pe-4">
-              <div style="background:rgba(130,0,180,0.12);border-radius:4px;height:6px;overflow:hidden">
-                <div style="background:var(--kramer-purple);height:100%;width:{{ p.pct }}%"></div>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{% if top_salespersons %}
-<div class="col-lg-6">
-  <div class="card border-0 shadow-sm h-100">
-    <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
-      <h6 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2" style="color:var(--kramer-purple)"></i>Top Account Managers</h6>
-      <a href="{% url 'salesperson_list' %}{% if filters.date_from or filters.date_to %}?date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% endif %}" class="btn btn-sm btn-outline-secondary">
-        View all <i class="bi bi-arrow-right ms-1"></i>
-      </a>
-    </div>
-    <div class="card-body p-0">
-      <table class="table table-hover mb-0 align-middle">
-        <thead>
-          <tr>
-            <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">#</th>
-            <th class="text-uppercase small text-muted fw-semibold">Name</th>
-            <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
-            <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Dist.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for sp in top_salespersons %}
-          <tr style="cursor:pointer" onclick="window.location='{% url 'distributor_list' %}?salesperson={{ sp.distributor__salesperson_name|urlencode }}'">
-            <td class="ps-4 py-3 text-muted small">{{ forloop.counter }}</td>
-            <td class="fw-semibold">{{ sp.distributor__salesperson_name }}</td>
-            <td class="text-end fw-bold text-revenue">{{ currency_symbol }}{{ sp.revenue|floatformat:0|intcomma }}</td>
-            <td class="text-end text-muted pe-4">
-              <span class="badge rounded-pill" style="background:rgba(130,5,180,0.12);color:var(--kramer-purple)">{{ sp.dist_count }}</span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-</div>
 
 <!-- Distributor breakdown table -->
 {% if dist_summary %}
