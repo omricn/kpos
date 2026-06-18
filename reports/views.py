@@ -113,6 +113,14 @@ def set_currency(request):
     return redirect(request.POST.get('next', '/'))
 
 
+def set_region(request):
+    """POST endpoint to set session region filter."""
+    region = request.POST.get('region', '')
+    request.session['region'] = region
+    request.session.modified = True
+    return redirect(request.POST.get('next', '/'))
+
+
 # ── Prior-period comparison helper ────────────────────────────────────────────
 
 def _prior_period_stats(qs_base, date_from_str, date_to_str):
@@ -471,7 +479,7 @@ def dashboard(request):
         'top_salespersons':  top_salespersons,
         'region_cards':   region_cards,
         'page_title':     'Revenue Dashboard',
-        'has_filters':    any([date_from, date_to, region, distributor_id]),
+        'has_filters':    any([date_from, date_to, distributor_id]),
         'today_date':     today,
         'user_display':   user_display,
         'initials':       initials,
@@ -768,7 +776,7 @@ def distributor_list(request):
         'dist_data': dist_data,
         'top3': top3,
         'chart_data': chart_data,
-        'has_filters': bool(selected_region or date_from or date_to or selected_sp),
+        'has_filters': bool(date_from or date_to or selected_sp),
         'filters': {'date_from': date_from, 'date_to': date_to, 'region': selected_region, 'salesperson': selected_sp},
         'jump_distributors': jump_distributors,
         'page_title': 'Distributors',
@@ -835,7 +843,7 @@ def product_list(request):
     return render(request, 'reports/product_list.html', {
         'products': products,
         'filters': {'date_from': date_from, 'date_to': date_to, 'q': search, 'region': region, 'sort': sort_by},
-        'has_filters': bool(date_from or date_to or search or region),
+        'has_filters': bool(date_from or date_to or search),
         'sort_by': sort_by,
         'all_regions': all_regions,
         'selected_region': region,
@@ -999,7 +1007,7 @@ def countries_view(request):
         'all_countries': all_countries,
         'selected_countries': selected_countries,
         'chart_data': chart_data,
-        'has_filters': bool(selected_country or selected_region or date_from or date_to),
+        'has_filters': bool(selected_country or date_from or date_to),
         'selected_region': selected_region,
         'all_regions': Distributor.objects.exclude(region='').values_list('region', flat=True).distinct().order_by('region'),
         'filters': {'date_from': date_from, 'date_to': date_to},

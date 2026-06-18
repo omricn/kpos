@@ -58,7 +58,7 @@
 body {
   background: var(--bg-page) !important;
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
   color: var(--text-primary);
   transition: background 0.2s, color 0.2s;

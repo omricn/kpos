@@ -64,6 +64,32 @@
         </li>
       </ul>
       <div class="d-flex align-items-center gap-3">
+        <form method="post" action="{% url 'set_region' %}" class="d-inline me-2">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="submit" name="region" value=""
+              class="btn px-2 py-1"
+              style="{% if not request.session.region %}background:#fff;color:#8200B4;border:1px solid #fff;font-weight:600;{% else %}background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.3);{% endif %}">
+              All
+            </button>
+            <button type="submit" name="region" value="EMEA"
+              class="btn px-2 py-1"
+              style="{% if request.session.region == 'EMEA' %}background:#fff;color:#8200B4;border:1px solid #fff;font-weight:600;{% else %}background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.3);{% endif %}">
+              EMEA
+            </button>
+            <button type="submit" name="region" value="Americas"
+              class="btn px-2 py-1"
+              style="{% if request.session.region == 'Americas' %}background:#fff;color:#8200B4;border:1px solid #fff;font-weight:600;{% else %}background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.3);{% endif %}">
+              Americas
+            </button>
+            <button type="submit" name="region" value="APAC"
+              class="btn px-2 py-1"
+              style="{% if request.session.region == 'APAC' %}background:#fff;color:#8200B4;border:1px solid #fff;font-weight:600;{% else %}background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.3);{% endif %}">
+              APAC
+            </button>
+          </div>
+        </form>
         <form method="post" action="{% url 'set_currency' %}" class="d-inline me-2">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">

@@ -32,15 +32,6 @@
         </div>
       </div>
       <div class="col-auto">
-        <label class="filter-label">Region</label>
-        <select class="form-select filter-input" name="region" style="min-width:140px">
-          <option value="">All Regions</option>
-          {% for r in all_regions %}
-          <option value="{{ r }}" {% if selected_region == r %}selected{% endif %}>{{ r }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-auto">
         <label class="filter-label">Country</label>
         <select class="form-select filter-input" name="country" style="min-width:200px">
           <option value="">All Countries</option>

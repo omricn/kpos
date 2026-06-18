@@ -51,17 +51,6 @@
                style="min-width:200px">
       </div>
 
-      <!-- Region -->
-      <div class="col-auto">
-        <label class="filter-label">Region</label>
-        <select class="form-select filter-input" name="region" style="min-width:150px">
-          <option value="">All Regions</option>
-          {% for r in all_regions %}
-          <option value="{{ r }}" {% if selected_region == r %}selected{% endif %}>{{ r }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
       <!-- Sort by -->
       <div class="col-12 col-xl-auto">
         <label class="filter-label">Sort by</label>
@@ -82,7 +71,7 @@
           <i class="bi bi-funnel-fill me-1"></i>Apply
         </button>
         {% if has_filters %}
-        <a class="btn btn-outline-secondary filter-btn" href="{% url 'product_list' %}?region=">
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'product_list' %}">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
         {% endif %}
