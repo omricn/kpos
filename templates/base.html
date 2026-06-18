@@ -24,6 +24,18 @@
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
       <span class="navbar-toggler-icon"></span>
     </button>
+    {% if user.is_authenticated %}
+    <span class="navbar-text d-none d-lg-inline ms-3">
+      <i class="bi bi-person-circle me-1"></i><span id="timeGreeting"></span>{{ user.first_name|default:user.username }}
+    </span>
+    <script>
+      (function(){
+        var h = new Date().getHours();
+        var g = h < 12 ? 'Good Morning, ' : h < 17 ? 'Good Afternoon, ' : 'Good Evening, ';
+        document.getElementById('timeGreeting').textContent = g;
+      })();
+    </script>
+    {% endif %}
     <div class="collapse navbar-collapse" id="mainNav">
       <ul class="navbar-nav ms-4 me-auto">
         <li class="nav-item">
@@ -52,18 +64,6 @@
         </li>
       </ul>
       <div class="d-flex align-items-center gap-3">
-        {% if user.is_authenticated %}
-        <span class="navbar-text d-none d-lg-inline">
-          <i class="bi bi-person-circle me-1"></i><span id="timeGreeting"></span>{{ user.first_name|default:user.username }}
-        </span>
-        <script>
-          (function(){
-            var h = new Date().getHours();
-            var g = h < 12 ? 'Good Morning, ' : h < 17 ? 'Good Afternoon, ' : 'Good Evening, ';
-            document.getElementById('timeGreeting').textContent = g;
-          })();
-        </script>
-        {% endif %}
         <form method="post" action="{% url 'set_currency' %}" class="d-inline me-2">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
