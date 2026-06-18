@@ -24,16 +24,15 @@ jobs:
           docker build -t kdeskregistry.azurecr.io/kpos:$TAG -t kdeskregistry.azurecr.io/kpos:latest .
           docker push kdeskregistry.azurecr.io/kpos:$TAG
           docker push kdeskregistry.azurecr.io/kpos:latest
-          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
-      - name: Log in to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Update Container App
-        run: |
-          az containerapp update \
-            --name kpos \
-            --resource-group KPOS \
-            --image kdeskregistry.azurecr.io/kpos:${{ env.IMAGE_TAG }}
+      # Uncomment once AZURE_CREDENTIALS secret is added (needs Azure Owner to create service principal):
+      # az ad sp create-for-rbac --name kpos-github-deploy --role contributor
+      #   --scopes .../resourceGroups/KPOS --sdk-auth
+      #
+      # - name: Log in to Azure
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+      #
+      # - name: Update Container App
+      #   run: az containerapp update --name kpos --resource-group KPOS --image kdeskregistry.azurecr.io/kpos:latest
