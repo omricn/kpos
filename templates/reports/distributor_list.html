@@ -12,7 +12,7 @@
   <div>
     <h4 class="mb-0 fw-bold" class="text-body">
       {% if selected_region %}
-        <a href="{% url 'distributor_list' %}" class="text-decoration-none me-2" style="color:#aaa;font-size:.9rem">
+        <a href="{% url 'distributor_list' %}?region=" class="text-decoration-none me-2" style="color:#aaa;font-size:.9rem">
           <i class="bi bi-chevron-left"></i> Regions
         </a>
         {{ selected_region }}

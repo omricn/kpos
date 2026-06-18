@@ -244,8 +244,16 @@ def country_display(raw):
 def dashboard(request):
     date_from = request.GET.get('date_from', '')
     date_to   = request.GET.get('date_to', '')
-    region    = request.GET.get('region', '')
     distributor_id = request.GET.get('distributor', '')
+
+    # Region: explicit URL param updates session; navigation falls back to session
+    region_param = request.GET.get('region')
+    if region_param is not None:
+        region = region_param.strip()
+        request.session['region'] = region
+        request.session.modified = True
+    else:
+        region = request.session.get('region', '')
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
@@ -647,7 +655,14 @@ def export_csv(request, pk):
 
 
 def distributor_list(request):
-    selected_region = request.GET.get('region', '').strip()
+    # Region: explicit URL param updates session; navigation falls back to session
+    region_param = request.GET.get('region')
+    if region_param is not None:
+        selected_region = region_param.strip()
+        request.session['region'] = selected_region
+        request.session.modified = True
+    else:
+        selected_region = request.session.get('region', '')
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()
     selected_sp = request.GET.get('salesperson', '').strip()
@@ -768,6 +783,18 @@ def product_list(request):
     date_from = request.GET.get('date_from', '').strip()
     date_to   = request.GET.get('date_to', '').strip()
     search    = request.GET.get('q', '').strip()
+    sort_by   = request.GET.get('sort', 'revenue')
+    if sort_by not in ('revenue', 'units'):
+        sort_by = 'revenue'
+
+    # Region: explicit URL param updates session; navigation falls back to session
+    region_param = request.GET.get('region')
+    if region_param is not None:
+        region = region_param.strip()
+        request.session['region'] = region
+        request.session.modified = True
+    else:
+        region = request.session.get('region', '')
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
@@ -782,6 +809,8 @@ def product_list(request):
         qs = qs.filter(
             Q(manufacturer_part_no__icontains=search) | Q(product_description__icontains=search)
         )
+    if region:
+        qs = qs.filter(distributor__region=region)
 
     products = list(
         _annotate_converted(qs, selected_currency, rates)
@@ -793,18 +822,23 @@ def product_list(request):
             dist_count=Count('distributor', distinct=True),
             records=Count('id'),
         )
-        .order_by('-revenue')
+        .order_by(f'-{sort_by}')
     )
-    total_rev = sum(float(p['revenue'] or 0) for p in products) or 1
+    total_metric = sum(float(p[sort_by] or 0) for p in products) or 1
     for p in products:
         p['revenue'] = float(p['revenue'] or 0)
         p['units'] = int(p['units'] or 0)
-        p['share_pct'] = round(p['revenue'] / total_rev * 100, 1)
+        p['share_pct'] = round(float(p[sort_by] or 0) / total_metric * 100, 1)
+
+    all_regions = list(Distributor.objects.filter(region__gt='').values_list('region', flat=True).distinct().order_by('region'))
 
     return render(request, 'reports/product_list.html', {
         'products': products,
-        'filters': {'date_from': date_from, 'date_to': date_to, 'q': search},
-        'has_filters': bool(date_from or date_to or search),
+        'filters': {'date_from': date_from, 'date_to': date_to, 'q': search, 'region': region, 'sort': sort_by},
+        'has_filters': bool(date_from or date_to or search or region),
+        'sort_by': sort_by,
+        'all_regions': all_regions,
+        'selected_region': region,
         'page_title': 'Products',
         'selected_currency': selected_currency,
         'currency_symbol': currency_symbol,
@@ -1171,6 +1205,15 @@ def salesperson_list(request):
     date_to   = request.GET.get('date_to', '').strip()
     selected_sp = request.GET.get('salesperson', '').strip()
 
+    # Region: explicit URL param updates session; navigation falls back to session
+    region_param = request.GET.get('region')
+    if region_param is not None:
+        region = region_param.strip()
+        request.session['region'] = region
+        request.session.modified = True
+    else:
+        region = request.session.get('region', '')
+
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
     rates = _get_rates()
@@ -1182,6 +1225,8 @@ def salesperson_list(request):
         qs = qs.filter(invoice_date__lte=date_to)
     if selected_sp:
         qs = qs.filter(distributor__salesperson_name=selected_sp)
+    if region:
+        qs = qs.filter(distributor__region=region)
 
     sp_data = list(
         _annotate_converted(qs, selected_currency, rates)
@@ -1216,6 +1261,7 @@ def salesperson_list(request):
         .distinct()
         .order_by('salesperson_name')
     )
+    all_regions = list(Distributor.objects.filter(region__gt='').values_list('region', flat=True).distinct().order_by('region'))
 
     return render(request, 'reports/salesperson_list.html', {
         'sp_data':         sp_data,
@@ -1223,8 +1269,10 @@ def salesperson_list(request):
         'chart_data':      chart_data,
         'all_salespersons': all_salespersons,
         'selected_sp':     selected_sp,
-        'has_filters':     bool(date_from or date_to or selected_sp),
-        'filters':         {'date_from': date_from, 'date_to': date_to},
+        'all_regions':     all_regions,
+        'selected_region': region,
+        'has_filters':     bool(date_from or date_to or selected_sp or region),
+        'filters':         {'date_from': date_from, 'date_to': date_to, 'region': region},
         'page_title':      'Account Managers',
         'selected_currency': selected_currency,
         'currency_symbol':   currency_symbol,

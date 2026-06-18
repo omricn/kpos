@@ -90,7 +90,7 @@
     </div>
     {% endfor %}
     <div class="px-4 py-3 border-top" style="background:#fafafa">
-      <a href="{% url 'salesperson_list' %}" class="text-decoration-none small" style="color:var(--kramer-purple)">
+      <a href="{% url 'salesperson_list' %}{% if filters.region %}?region={{ filters.region }}{% endif %}" class="text-decoration-none small" style="color:var(--kramer-purple)">
         <i class="bi bi-arrow-right me-1"></i>View full Account Managers page
       </a>
     </div>
@@ -154,7 +154,7 @@
           <i class="bi bi-funnel-fill me-1"></i>Apply
         </button>
         {% if has_filters %}
-        <a class="btn btn-outline-secondary filter-btn" href="{% url 'dashboard' %}">
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'dashboard' %}?region=">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
         {% endif %}

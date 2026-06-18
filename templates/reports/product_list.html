@@ -51,13 +51,38 @@
                style="min-width:200px">
       </div>
 
+      <!-- Region -->
+      <div class="col-auto">
+        <label class="filter-label">Region</label>
+        <select class="form-select filter-input" name="region" style="min-width:150px">
+          <option value="">All Regions</option>
+          {% for r in all_regions %}
+          <option value="{{ r }}" {% if selected_region == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Sort by -->
+      <div class="col-12 col-xl-auto">
+        <label class="filter-label">Sort by</label>
+        <div class="btn-group btn-group-sm" id="productSortBtns">
+          <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'revenue' %}active{% endif %}" data-sort="revenue">
+            <i class="bi bi-currency-dollar me-1"></i>Revenue
+          </button>
+          <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'units' %}active{% endif %}" data-sort="units">
+            <i class="bi bi-box-seam me-1"></i>Units
+          </button>
+        </div>
+        <input type="hidden" name="sort" id="productHiddenSort" value="{{ filters.sort }}">
+      </div>
+
       <!-- Apply / Clear -->
       <div class="col-auto d-flex gap-2 align-items-end">
         <button class="btn btn-kramer filter-btn px-4" type="submit">
           <i class="bi bi-funnel-fill me-1"></i>Apply
         </button>
         {% if has_filters %}
-        <a class="btn btn-outline-secondary filter-btn" href="{% url 'product_list' %}">
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'product_list' %}?region=">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
         {% endif %}
@@ -80,11 +105,17 @@
         <tr>
           <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Product</th>
           <th class="text-uppercase small text-muted fw-semibold">Part Number</th>
-          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
-          <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
+          <th class="text-uppercase small fw-semibold text-end" {% if sort_by == 'revenue' %}style="color:var(--kramer-purple)"{% else %}style="color:#6c757d"{% endif %}>
+            Revenue ({{ selected_currency }}){% if sort_by == 'revenue' %} <i class="bi bi-sort-down-alt"></i>{% endif %}
+          </th>
+          <th class="text-uppercase small fw-semibold text-end" {% if sort_by == 'units' %}style="color:var(--kramer-purple)"{% else %}style="color:#6c757d"{% endif %}>
+            Units{% if sort_by == 'units' %} <i class="bi bi-sort-down-alt"></i>{% endif %}
+          </th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Distributors</th>
           <th class="text-uppercase small text-muted fw-semibold text-end pe-4">Records</th>
-          <th style="min-width:100px"></th>
+          <th style="min-width:100px" class="text-uppercase small text-muted fw-semibold">
+            {% if sort_by == 'units' %}Unit{% else %}Rev{% endif %} Share
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -142,6 +173,13 @@
     const activeBtn = document.querySelector('#productPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
     if (activeBtn) activeBtn.classList.add('active');
   }
+
+  document.querySelectorAll('#productSortBtns .sort-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('productHiddenSort').value = this.dataset.sort;
+      document.getElementById('productFilterForm').submit();
+    });
+  });
 
   const today = new Date();
   document.querySelectorAll('#productPeriodPresets .period-btn').forEach(btn => {
