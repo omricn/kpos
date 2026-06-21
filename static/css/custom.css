@@ -455,22 +455,27 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes ai-orb-spin-reverse {
   to { transform: rotate(-360deg); }
 }
+@keyframes ai-orb-morph {
+  0%,100% { border-radius: 62% 38% 32% 68% / 58% 34% 66% 42%; }
+  20%      { border-radius: 38% 62% 55% 45% / 48% 60% 40% 52%; }
+  40%      { border-radius: 52% 48% 38% 62% / 35% 62% 38% 65%; }
+  60%      { border-radius: 42% 58% 65% 35% / 62% 38% 62% 38%; }
+  80%      { border-radius: 55% 45% 42% 58% / 44% 56% 44% 56%; }
+}
 
 .ai-orb {
   position: fixed;
   top: 160px;
   right: 20px;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
+  width: 62px;
+  height: 62px;
+  border-radius: 62% 38% 32% 68% / 58% 34% 66% 42%;
   background: conic-gradient(
     from 0deg,
     #8200B4 0deg,
-    #a825cc 70deg,
-    rgba(190, 0, 120, 0.9) 130deg,
-    #8200B4 190deg,
-    rgba(104, 255, 195, 0.45) 250deg,
-    #8200B4 310deg,
+    #BE0078 80deg,
+    #a825cc 160deg,
+    rgba(104, 255, 195, 0.55) 240deg,
     #8200B4 360deg
   );
   display: flex;
@@ -478,19 +483,19 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   cursor: pointer;
   z-index: 1055;
-  box-shadow: 0 4px 18px rgba(130, 0, 180, 0.55);
-  transition: scale 0.18s, box-shadow 0.18s;
+  filter: drop-shadow(0 0 7px rgba(130,0,180,0.75)) drop-shadow(0 0 18px rgba(130,0,180,0.3));
+  transition: scale 0.18s, filter 0.18s;
   user-select: none;
-  animation: ai-orb-spin 7s linear infinite;
+  animation: ai-orb-spin 9s linear infinite, ai-orb-morph 5s ease-in-out infinite;
 }
 .ai-orb:hover {
-  scale: 1.1;
-  box-shadow: 0 6px 28px rgba(130, 0, 180, 0.75);
+  scale: 1.08;
+  filter: drop-shadow(0 0 12px rgba(130,0,180,0.95)) drop-shadow(0 0 28px rgba(130,0,180,0.5));
 }
 
 .ai-orb-inner {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--kramer-purple);
   color: #fff;
@@ -499,7 +504,8 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   font-size: 1.3rem;
   pointer-events: none;
-  animation: ai-orb-spin-reverse 7s linear infinite;
+  flex-shrink: 0;
+  animation: ai-orb-spin-reverse 9s linear infinite;
 }
 
 .ai-panel {
