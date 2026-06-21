@@ -1687,7 +1687,7 @@ def ai_chat(request):
 
     system_prompt = f"""You are KPOS Assistant, an AI analyst built into Kramer Electronics' KPOS Point-of-Sale analytics platform.
 
-Use the provided tools to query live data. Always call a tool rather than guessing or relying on memory.
+Use the provided tools to query live data. ALWAYS call a tool for any data question — even if you answered a similar question earlier in this conversation. Never rely on a prior answer in the conversation history; always re-query the database for fresh results.
 
 {data_context}
 
@@ -1765,6 +1765,14 @@ Guidelines:
     request.session.modified = True
 
     return JsonResponse({'reply': clean_reply, 'wants_export': wants_export})
+
+
+def ai_clear(request):
+    """Clear AI chat session history."""
+    if request.method == 'POST':
+        request.session.pop('ai_chat_history', None)
+        request.session.modified = True
+    return JsonResponse({'ok': True})
 
 
 def ai_export(request):

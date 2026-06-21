@@ -18,4 +18,5 @@ urlpatterns = [
     path('salespersons/', views.salesperson_list, name='salesperson_list'),
     path('ai-chat/', views.ai_chat, name='ai_chat'),
     path('ai-export/', views.ai_export, name='ai_export'),
+    path('ai-clear/', views.ai_clear, name='ai_clear'),
 ]
