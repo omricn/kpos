@@ -198,6 +198,7 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
 (function () {
   var chatOpen = false;
   var ORB_SIZE = 66;
+  var _bubbleIdx = 0;
 
   function getCsrf() {
     var m = document.cookie.match(/csrftoken=([^;]+)/);
@@ -304,7 +305,7 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
     var welcome  = document.getElementById('aiWelcome');
     if (welcome) welcome.remove();
 
-    var id  = 'aib-' + Date.now();
+    var id  = 'aib-' + (++_bubbleIdx);
     var div = document.createElement('div');
     div.id        = id;
     div.className = 'ai-bubble ' + cls;
