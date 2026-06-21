@@ -132,7 +132,7 @@
 </main>
 
 <!-- AI Assistant (staff only) -->
-{% if user.is_staff %}
+{% if user.is_staff or user.username == 'ocohen' or user.email == 'ocohen@kramerav.com' %}
 <div id="aiOrb" class="ai-orb" onclick="handleOrbClick(event)" title="KPOS Assistant">
   <div class="ai-orb-inner"><i class="bi bi-stars"></i></div>
 </div>
