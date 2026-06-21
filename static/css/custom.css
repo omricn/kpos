@@ -494,6 +494,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .ai-orb-inner {
+  position: relative;
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -506,7 +507,14 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
   flex-shrink: 0;
   animation: ai-orb-spin-reverse 9s linear infinite;
-  box-shadow: 0 0 0 6px rgba(130, 0, 180, 0.13);
+}
+.ai-orb-inner::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  background: rgba(130, 0, 180, 0.05);
+  pointer-events: none;
 }
 
 .ai-panel {
