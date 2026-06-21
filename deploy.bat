@@ -4,26 +4,24 @@ set REGISTRY=kdeskregistry.azurecr.io
 set RG=KPOS
 set APP=kpos
 
-for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd-HHmm'"') do set TAG=%%i
-set IMAGE=%REGISTRY%/kpos:%TAG%
+for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd-HHmm'"') do set SUFFIX=%%i
 
-echo =^> Tag: %TAG%
+echo =^> Revision suffix: %SUFFIX%
 
 echo =^> Logging in to Azure Container Registry...
 az acr login --name kdeskregistry
 if errorlevel 1 goto :error
 
 echo =^> Building Docker image (no cache)...
-docker build --no-cache -t %IMAGE% -t %REGISTRY%/kpos:latest .
+docker build --no-cache -t %REGISTRY%/kpos:latest .
 if errorlevel 1 goto :error
 
-echo =^> Pushing image to registry...
-docker push %IMAGE%
+echo =^> Pushing image...
 docker push %REGISTRY%/kpos:latest
 if errorlevel 1 goto :error
 
-echo =^> Updating Container App to %TAG%...
-az containerapp update --resource-group %RG% --name %APP% --image %IMAGE%
+echo =^> Deploying new revision %SUFFIX%...
+az containerapp update --resource-group %RG% --name %APP% --image %REGISTRY%/kpos:latest --revision-suffix %SUFFIX%
 if errorlevel 1 goto :error
 
 echo.
