@@ -14,7 +14,7 @@
       <i class="bi bi-trophy me-1"></i>Top Products
     </button>
     <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#topManagersPanel">
-      <i class="bi bi-person-badge me-1"></i>Top Account Managers
+      <i class="bi bi-person-badge me-1"></i>Top Sales Reps
     </button>
   </div>
 </div>
@@ -56,12 +56,12 @@
   </div>
 </div>
 
-<!-- Top Account Managers slide panel -->
+<!-- Top Sales Reps slide panel -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="topManagersPanel" style="width:420px;max-width:100vw">
   <div class="offcanvas-header border-0 pb-2" style="background:linear-gradient(135deg,var(--kramer-purple) 0%,var(--kramer-purple-light) 100%)">
     <div>
       <h5 class="offcanvas-title mb-0 fw-bold text-white">
-        <i class="bi bi-person-badge-fill me-2" style="color:#FCD34D"></i>Top Account Managers
+        <i class="bi bi-person-badge-fill me-2" style="color:#FCD34D"></i>Top Sales Reps
       </h5>
       <p class="mb-0 small text-white-50">By revenue — matches current filters</p>
     </div>
@@ -91,7 +91,7 @@
     {% endfor %}
     <div class="px-4 py-3 border-top" style="background:#fafafa">
       <a href="{% url 'salesperson_list' %}{% if filters.region %}?region={{ filters.region }}{% endif %}" class="text-decoration-none small" style="color:var(--kramer-purple)">
-        <i class="bi bi-arrow-right me-1"></i>View full Account Managers page
+        <i class="bi bi-arrow-right me-1"></i>View full Sales Reps page
       </a>
     </div>
   </div>

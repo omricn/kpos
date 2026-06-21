@@ -69,9 +69,9 @@
         </div>
       </div>
 
-      <!-- Account Manager filter -->
+      <!-- Sales Rep filter -->
       <div class="col-auto">
-        <label class="filter-label">Account Manager</label>
+        <label class="filter-label">Sales Rep</label>
         <select class="form-select filter-input" name="salesperson" style="min-width:180px">
           <option value="">All Managers</option>
           {% for sp in all_salespersons %}
@@ -211,7 +211,7 @@
       <thead>
         <tr>
           <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Distributor</th>
-          <th class="text-uppercase small text-muted fw-semibold">Account Manager</th>
+          <th class="text-uppercase small text-muted fw-semibold">Sales Rep</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Records</th>
           <th class="pe-4"></th>

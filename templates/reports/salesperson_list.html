@@ -13,7 +13,7 @@
     <a href="{% url 'dashboard' %}" class="text-decoration-none text-muted small">
       <i class="bi bi-chevron-left me-1"></i>Dashboard
     </a>
-    <h4 class="mb-1 fw-bold mt-1">Account Managers</h4>
+    <h4 class="mb-1 fw-bold mt-1">Sales Reps</h4>
     <p class="text-muted small mb-0">Distributor revenue by account manager — all figures in {{ selected_currency }}</p>
   </div>
   <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
@@ -50,9 +50,9 @@
         </div>
       </div>
 
-      <!-- Account Manager -->
+      <!-- Sales Rep -->
       <div class="col-auto">
-        <label class="filter-label">Account Manager</label>
+        <label class="filter-label">Sales Rep</label>
         <select class="form-select filter-input" name="salesperson" style="min-width:180px">
           <option value="">All Managers</option>
           {% for sp in all_salespersons %}
@@ -102,7 +102,7 @@
 <!-- Horizontal bar chart -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body p-4">
-    <h6 class="mb-3 fw-bold">Revenue by Account Manager (Top 10)</h6>
+    <h6 class="mb-3 fw-bold">Revenue by Sales Rep (Top 10)</h6>
     <div style="position:relative;height:{% if sp_data|length > 5 %}340px{% else %}220px{% endif %}">
       <canvas id="spChart"></canvas>
     </div>
@@ -113,14 +113,14 @@
 {% if sp_data %}
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
-    <h6 class="mb-0 fw-bold">All Account Managers ({{ sp_data|length }})</h6>
+    <h6 class="mb-0 fw-bold">All Sales Reps ({{ sp_data|length }})</h6>
   </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead>
         <tr style="background:var(--bg-elevated)">
           <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">#</th>
-          <th class="text-uppercase small text-muted fw-semibold">Account Manager</th>
+          <th class="text-uppercase small text-muted fw-semibold">Sales Rep</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Distributors</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
           <th class="text-uppercase small text-muted fw-semibold text-end">Units</th>
