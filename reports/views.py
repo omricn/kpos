@@ -1453,38 +1453,53 @@ def _build_ai_context():
 KPOS_TOOLS = [
     {
         "name": "get_top_products",
-        "description": "Get top-selling products ranked by revenue or units. Filter by any combination of time period, distributor, or region.",
+        "description": (
+            "Get top-selling Kramer products by revenue or units sold. "
+            "Products are identified by manufacturer part number + description. "
+            "Use this for questions like 'top products', 'best sellers', 'what sold most', 'which SKUs'. "
+            "Filter by time period (year/month/quarter), distributor, region, country, or product keyword."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "year":             {"type": "integer", "description": "Filter by year (e.g. 2026)"},
-                "month":            {"type": "integer", "description": "Filter by month number 1–12"},
-                "quarter":          {"type": "integer", "description": "Filter by quarter 1–4"},
-                "distributor_code": {"type": "string",  "description": "Distributor code (e.g. 'cdev')"},
-                "region":           {"type": "string",  "description": "Region name (e.g. 'EMEA')"},
-                "sort_by":          {"type": "string",  "enum": ["revenue", "units"]},
-                "limit":            {"type": "integer", "description": "Max results, default 10"},
+                "year":             {"type": "integer", "description": "Calendar year, e.g. 2026"},
+                "month":            {"type": "integer", "description": "Month number 1–12"},
+                "quarter":          {"type": "integer", "description": "Quarter 1–4"},
+                "distributor_code": {"type": "string",  "description": "Distributor code from the distributor list, e.g. 'cdev'"},
+                "region":           {"type": "string",  "description": "Region name, e.g. 'EMEA', 'Americas'"},
+                "country":          {"type": "string",  "description": "Country name partial match, e.g. 'France'"},
+                "product_name":     {"type": "string",  "description": "Keyword to filter by part number or description, e.g. 'HDMI' or '4K'"},
+                "sort_by":          {"type": "string",  "enum": ["revenue", "units"], "description": "Default: revenue"},
+                "limit":            {"type": "integer", "description": "Number of results, default 10, max 30"},
             },
         },
     },
     {
         "name": "get_top_distributors",
-        "description": "Get top distributors ranked by revenue or units. Filter by time period or region.",
+        "description": (
+            "Get top-performing distributors by revenue or units. "
+            "Use for questions like 'which distributor sells most', 'distributor performance', 'best distributor'. "
+            "Filter by time period or region. To filter by a specific product, note that this tool does not support product filtering — use get_top_products instead."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "year":    {"type": "integer"},
                 "month":   {"type": "integer"},
                 "quarter": {"type": "integer"},
-                "region":  {"type": "string"},
-                "sort_by": {"type": "string", "enum": ["revenue", "units"]},
+                "region":  {"type": "string",  "description": "e.g. 'EMEA', 'Americas'"},
+                "sort_by": {"type": "string",  "enum": ["revenue", "units"]},
                 "limit":   {"type": "integer"},
             },
         },
     },
     {
         "name": "get_top_customers",
-        "description": "Get top customers ranked by revenue or units. Filter by time period, distributor, region, or country.",
+        "description": (
+            "Get top end-customers (the companies/resellers that bought from our distributors) by revenue or units. "
+            "Use for questions like 'top customers', 'biggest buyers', 'who bought most', 'customer breakdown'. "
+            "Filter by time period, distributor, region, or country."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1493,7 +1508,7 @@ KPOS_TOOLS = [
                 "quarter":          {"type": "integer"},
                 "distributor_code": {"type": "string"},
                 "region":           {"type": "string"},
-                "country":          {"type": "string", "description": "Country name (partial match)"},
+                "country":          {"type": "string", "description": "Country name partial match"},
                 "sort_by":          {"type": "string", "enum": ["revenue", "units"]},
                 "limit":            {"type": "integer"},
             },
@@ -1501,7 +1516,11 @@ KPOS_TOOLS = [
     },
     {
         "name": "get_top_sales_reps",
-        "description": "Get sales representative performance ranked by revenue. Filter by time period, distributor, or region.",
+        "description": (
+            "Get top sales representatives by revenue generated. "
+            "Sales reps are assigned per distributor — not all distributors report sales rep data. "
+            "Use for questions like 'top reps', 'sales rep performance', 'who sold most'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1516,20 +1535,28 @@ KPOS_TOOLS = [
     },
     {
         "name": "get_revenue_trend",
-        "description": "Get month-by-month revenue and units trend. Filter by year, distributor, region, or product.",
+        "description": (
+            "Get month-by-month revenue and units trend over time. "
+            "Use for questions like 'trend', 'over time', 'by month', 'growth', 'how did X perform across months'. "
+            "Filter by year, distributor, region, or product keyword."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "year":             {"type": "integer"},
+                "year":             {"type": "integer", "description": "Limit trend to a specific year"},
                 "distributor_code": {"type": "string"},
                 "region":           {"type": "string"},
-                "product_name":     {"type": "string", "description": "Product name partial match"},
+                "product_name":     {"type": "string", "description": "Keyword to filter by part number or description"},
             },
         },
     },
     {
         "name": "get_summary",
-        "description": "Get KPI summary: total revenue, units, customer count, product count. Filter by any time period, distributor, or region.",
+        "description": (
+            "Get a KPI snapshot: total revenue (USD), total units, record count, unique customers, distributors, products. "
+            "Use for questions like 'summary', 'overview', 'how much total', 'overall performance', 'total revenue'. "
+            "Always filter by at least a year or month to get meaningful numbers."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1568,12 +1595,14 @@ def _apply_filters(qs, year=None, month=None, quarter=None,
 
 
 def _tool_get_top_products(year=None, month=None, quarter=None,
-                           distributor_code=None, region=None, sort_by='revenue', limit=10):
+                           distributor_code=None, region=None, country=None,
+                           product_name=None, sort_by='revenue', limit=10):
     limit = min(int(limit or 10), 30)
     qs = _apply_filters(
         POSRecord.objects.exclude(manufacturer_part_no='').filter(invoiced_value__isnull=False),
         year=year, month=month, quarter=quarter,
-        distributor_code=distributor_code, region=region)
+        distributor_code=distributor_code, region=region,
+        country=country, product_name=product_name)
     order = '-total_usd' if sort_by != 'units' else '-total_qty'
     rows = (qs.values('manufacturer_part_no', 'product_description')
               .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
@@ -1581,7 +1610,7 @@ def _tool_get_top_products(year=None, month=None, quarter=None,
     if not rows:
         return "No product data found for those filters."
     return '\n'.join(
-        f"{i}. {r['manufacturer_part_no']} ({r['product_description'] or 'no description'}): "
+        f"{i}. {r['product_description'] or r['manufacturer_part_no']} ({r['manufacturer_part_no']}): "
         f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
         for i, r in enumerate(rows, 1)
     )
@@ -1614,13 +1643,13 @@ def _tool_get_top_customers(year=None, month=None, quarter=None,
         year=year, month=month, quarter=quarter,
         distributor_code=distributor_code, region=region, country=country)
     order = '-total_usd' if sort_by != 'units' else '-total_qty'
-    rows = (qs.values('customer_name', 'country', 'distributor__region')
+    rows = (qs.values('customer_name', 'country', 'distributor__name', 'distributor__region')
               .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
               .order_by(order)[:limit])
     if not rows:
         return "No customer data found for those filters."
     return '\n'.join(
-        f"{i}. {r['customer_name']} ({r['country'] or '—'}, {r['distributor__region']}): "
+        f"{i}. {r['customer_name']} ({r['country'] or '—'}) via {r['distributor__name']}: "
         f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
         for i, r in enumerate(rows, 1)
     )
@@ -1726,18 +1755,26 @@ def ai_chat(request):
     data_context = _build_ai_context()
     today_str = date_cls.today().strftime('%B %d, %Y')
 
-    system_prompt = f"""You are KPOS Assistant, an AI analyst built into Kramer Electronics' KPOS Point-of-Sale analytics platform.
+    system_prompt = f"""You are KPOS Assistant, an AI analyst embedded in Kramer Electronics' internal POS analytics platform.
 
-Use the provided tools to query live data. ALWAYS call a tool for any data question — even if you answered a similar question earlier in this conversation. Never rely on a prior answer in the conversation history; always re-query the database for fresh results.
+## What this platform contains
+Kramer distributors submit weekly/monthly Point-of-Sale reports. Each record = one line item: a product sold by a distributor to an end-customer, with quantity, invoiced value, currency, country, and invoice date.
+- "Customer" = the reseller or company that bought from the distributor (not the end consumer).
+- "Product" = identified by manufacturer part number + product description.
+- "Revenue" = invoiced value converted to USD using monthly exchange rates.
+- Not every distributor reports every field (e.g., some don't have sales rep data).
 
+## Data available
 {data_context}
+Today: {today_str}. All revenue is in USD.
 
-Today: {today_str}. All revenue figures are normalized to USD.
-
-Guidelines:
-- Keep replies short and direct — 1–3 sentences unless detail is genuinely needed. No preamble or filler.
-- Use conversation context for follow-ups: if the user asks "which are the top 3?" after asking about February, query for February.
-- Format numbers with commas and $ prefix (e.g., $1,234,567).
+## How to respond
+- ALWAYS call a tool for any data question. Never rely on a prior answer — always re-query for fresh results.
+- For follow-up questions ("top 3", "same but for EMEA", "what about February?"), carry the filters from context into the tool call.
+- If a user says "this year" use {today_str[:4]}; "last month" use the prior calendar month; "this month" use the current month.
+- Keep replies short and direct — 2–4 sentences unless the user asks for detail. Lead with the answer, not preamble.
+- Format numbers: $1,234,567 for revenue, 1,234 for units. Bold key figures if markdown helps.
+- If the tool returns no data, say so plainly: "No records found for [filter]." Don't speculate about why.
 - If asked to export to Excel or spreadsheet, end your reply with exactly: [EXPORT_EXCEL]
 """
 
