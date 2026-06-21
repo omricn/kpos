@@ -131,8 +131,7 @@
   {% block content %}{% endblock %}
 </main>
 
-<!-- AI Assistant (staff only) -->
-{% if user.is_staff or user.username == 'ocohen' or user.email == 'ocohen@kramerav.com' %}
+<!-- AI Assistant -->
 <div id="aiOrb" class="ai-orb" onclick="handleOrbClick(event)" title="KPOS Assistant">
   <div class="ai-orb-inner"><i class="bi bi-stars"></i></div>
 </div>
@@ -359,7 +358,6 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
   window.addEventListener('resize', positionOrbToCard);
 })();
 </script>
-{% endif %}
 {% block extra_js %}{% endblock %}
 </body>
 </html>
