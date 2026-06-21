@@ -497,7 +497,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(130, 0, 180, 0.68);
+  background: rgba(130, 0, 180, 0.40);
   color: #fff;
   display: flex;
   align-items: center;
