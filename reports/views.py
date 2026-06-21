@@ -1461,6 +1461,28 @@ def _build_ai_context():
         if m['month']:
             lines.append(f"  {m['month'].strftime('%Y-%m')}: ${m['total_usd'] or 0:,.0f} | {m['total_qty'] or 0:,} units")
 
+    monthly_products_qs = (
+        qs.exclude(product_name='')
+        .annotate(month=TruncMonth('invoice_date'))
+        .values('month', 'product_name')
+        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+        .order_by('month', '-total_usd')
+    )
+    lines.append("\nTop products per month:")
+    cur_month = None
+    month_prod_count = 0
+    for row in monthly_products_qs:
+        if row['month'] != cur_month:
+            cur_month = row['month']
+            month_prod_count = 0
+            if cur_month:
+                lines.append(f"  {cur_month.strftime('%Y-%m')}:")
+        if month_prod_count < 10 and cur_month:
+            lines.append(
+                f"    {row['product_name']}: ${row['total_usd'] or 0:,.0f} | {row['total_qty'] or 0:,} units"
+            )
+            month_prod_count += 1
+
     top_customers = (
         qs.exclude(customer_name='')
         .values('customer_name', 'country', 'distributor__region')
