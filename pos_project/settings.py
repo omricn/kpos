@@ -105,3 +105,5 @@ if os.environ.get('ADFS_TENANT_ID'):
     }
     LOGIN_URL = 'django_auth_adfs:login'
     LOGIN_REDIRECT_URL = '/'
+
+CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')

@@ -4,3 +4,4 @@ gunicorn>=21.0
 whitenoise>=6.6
 psycopg2-binary>=2.9
 django-auth-adfs>=1.12
+anthropic>=0.40.0

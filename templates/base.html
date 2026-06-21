@@ -131,6 +131,40 @@
   {% block content %}{% endblock %}
 </main>
 
+<!-- AI Assistant -->
+<div id="aiOrb" class="ai-orb" onclick="toggleAiChat()" title="KPOS Assistant">
+  <i class="bi bi-stars"></i>
+</div>
+
+<div id="aiPanel" class="ai-panel" role="dialog" aria-label="KPOS Assistant">
+  <div class="ai-panel-header">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-stars" style="color:var(--kramer-purple)"></i>
+      <span class="fw-semibold" style="font-size:0.95rem">KPOS Assistant</span>
+    </div>
+    <button style="background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--text-muted)" onclick="toggleAiChat()">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div class="ai-messages" id="aiMessages">
+    <div class="ai-welcome" id="aiWelcome">
+      <i class="bi bi-stars" style="font-size:2rem;color:var(--kramer-purple)"></i>
+      <p class="mt-2 mb-0 text-muted" style="font-size:0.84rem">Ask me anything about your POS data — distributors, products, revenue trends, top customers, and more.</p>
+    </div>
+  </div>
+  <div class="ai-input-area">
+    <div class="d-flex gap-2">
+      <input type="text" id="aiInput" class="form-control form-control-sm"
+             placeholder="Ask about your data…"
+             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage()}"
+             autocomplete="off">
+      <button class="btn btn-kramer btn-sm px-3" onclick="sendAiMessage()" id="aiSendBtn">
+        <i class="bi bi-send-fill"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function() {
@@ -156,6 +190,109 @@
     if (window.onThemeChange) window.onThemeChange(next);
   };
   updateIcon(document.documentElement.getAttribute('data-bs-theme') || 'dark');
+})();
+</script>
+<script>
+// ── AI Assistant ──────────────────────────────────────────────────────────────
+(function () {
+  var chatOpen = false;
+
+  function getCsrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  window.toggleAiChat = function () {
+    var panel = document.getElementById('aiPanel');
+    var orb   = document.getElementById('aiOrb');
+    chatOpen = !chatOpen;
+    if (chatOpen) {
+      panel.classList.add('open');
+      orb.style.display = 'none';
+      setTimeout(function () {
+        var inp = document.getElementById('aiInput');
+        if (inp) inp.focus();
+      }, 320);
+    } else {
+      panel.classList.remove('open');
+      setTimeout(function () { orb.style.display = ''; }, 220);
+    }
+  };
+
+  window.sendAiMessage = function () {
+    var input = document.getElementById('aiInput');
+    var btn   = document.getElementById('aiSendBtn');
+    var msg   = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    input.disabled = true;
+    btn.disabled = true;
+
+    appendBubble(msg, 'user');
+    var thinkId = appendBubble('Thinking…', 'bot thinking');
+
+    fetch('{% url "ai_chat" %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+      body: JSON.stringify({ message: msg }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        removeBubble(thinkId);
+        if (data.reply) {
+          appendBubble(data.reply, 'bot', data.wants_export);
+        } else if (data.error) {
+          appendBubble('Error: ' + data.error, 'bot ai-error-msg');
+        }
+      })
+      .catch(function () {
+        removeBubble(thinkId);
+        appendBubble('Something went wrong. Please try again.', 'bot ai-error-msg');
+      })
+      .finally(function () {
+        input.disabled = false;
+        btn.disabled = false;
+        input.focus();
+      });
+  };
+
+  function appendBubble(text, cls, wantsExport) {
+    var messages = document.getElementById('aiMessages');
+    var welcome  = document.getElementById('aiWelcome');
+    if (welcome) welcome.remove();
+
+    var id  = 'aib-' + Date.now();
+    var div = document.createElement('div');
+    div.id        = id;
+    div.className = 'ai-bubble ' + cls;
+
+    if (cls.indexOf('bot') !== -1) {
+      div.innerHTML = text.replace(/\n/g, '<br>');
+    } else {
+      div.textContent = text;
+    }
+
+    if (wantsExport) {
+      var btn  = document.createElement('a');
+      btn.href        = '{% url "ai_export" %}';
+      btn.className   = 'btn btn-sm btn-outline-success mt-2 d-inline-block';
+      btn.style.fontSize = '0.78rem';
+      btn.innerHTML   = '<i class="bi bi-file-earmark-excel me-1"></i>Download Excel';
+      btn.target      = '_blank';
+      div.appendChild(document.createElement('br'));
+      div.appendChild(btn);
+    }
+
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return id;
+  }
+
+  function removeBubble(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+  }
 })();
 </script>
 {% block extra_js %}{% endblock %}

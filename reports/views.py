@@ -10,7 +10,8 @@ from django.core.cache import cache
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, F, DecimalField, ExpressionWrapper, Value, Subquery, OuterRef
 from django.db.models.functions import TruncMonth, TruncWeek, ExtractYear, ExtractMonth
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse
+from django.conf import settings as django_settings
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
 from .models import Distributor, POSUpload, POSRecord, ExchangeRate, MonthlyRate, PriorityProduct
@@ -1379,3 +1380,268 @@ def weekly_view(request):
         'selected_currency': selected_currency,
         'currency_symbol': currency_symbol,
     })
+
+
+# ── AI Assistant ──────────────────────────────────────────────────────────────
+
+def _build_ai_context():
+    """Aggregate DB snapshot for the AI assistant system prompt. Cached 5 min."""
+    cached = cache.get('kpos_ai_context')
+    if cached:
+        return cached
+
+    lines = []
+
+    dates = POSRecord.objects.aggregate(
+        min_date=Min('invoice_date'),
+        max_date=Max('invoice_date'),
+        total_records=Count('id'),
+    )
+    lines.append(f"Data range: {dates['min_date']} to {dates['max_date']}")
+    lines.append(f"Total records: {dates['total_records']:,}")
+
+    distributors = list(Distributor.objects.values('name', 'region', 'code').order_by('region', 'name'))
+    lines.append(f"\nDistributors ({len(distributors)} total):")
+    for d in distributors:
+        lines.append(f"  {d['name']} (Region: {d['region']}, Code: {d['code']})")
+
+    qs = _annotate_converted(POSRecord.objects.all(), 'USD')
+
+    dist_stats = (
+        qs.values('distributor__name', 'distributor__region')
+        .annotate(
+            total_usd=Sum('converted_value'),
+            total_qty=Sum('quantity'),
+            record_count=Count('id'),
+        )
+        .order_by('-total_usd')
+    )
+    lines.append("\nDistributor revenue (USD equivalent):")
+    for d in dist_stats:
+        lines.append(
+            f"  {d['distributor__name']} ({d['distributor__region']}): "
+            f"${d['total_usd'] or 0:,.0f} | {d['total_qty'] or 0:,} units | {d['record_count']:,} records"
+        )
+
+    top_products = (
+        qs.exclude(product_name='')
+        .values('product_name')
+        .annotate(
+            total_usd=Sum('converted_value'),
+            total_qty=Sum('quantity'),
+            dist_count=Count('distributor', distinct=True),
+        )
+        .order_by('-total_usd')[:30]
+    )
+    lines.append("\nTop 30 products by revenue (USD):")
+    for p in top_products:
+        lines.append(
+            f"  {p['product_name']}: ${p['total_usd'] or 0:,.0f} | "
+            f"{p['total_qty'] or 0:,} units | {p['dist_count']} distributor(s)"
+        )
+
+    monthly = (
+        qs.annotate(month=TruncMonth('invoice_date'))
+        .values('month')
+        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+        .order_by('month')
+    )
+    lines.append("\nMonthly trend (USD):")
+    for m in monthly:
+        if m['month']:
+            lines.append(f"  {m['month'].strftime('%Y-%m')}: ${m['total_usd'] or 0:,.0f} | {m['total_qty'] or 0:,} units")
+
+    top_customers = (
+        qs.exclude(customer_name='')
+        .values('customer_name', 'country', 'distributor__region')
+        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+        .order_by('-total_usd')[:25]
+    )
+    lines.append("\nTop 25 customers by revenue (USD):")
+    for c in top_customers:
+        lines.append(
+            f"  {c['customer_name']} ({c['country'] or 'unknown'}, {c['distributor__region']}): "
+            f"${c['total_usd'] or 0:,.0f} | {c['total_qty'] or 0:,} units"
+        )
+
+    rep_stats = (
+        qs.filter(distributor__salesperson_name__gt='')
+        .values('distributor__salesperson_name')
+        .annotate(
+            total_usd=Sum('converted_value'),
+            total_qty=Sum('quantity'),
+            dist_count=Count('distributor', distinct=True),
+        )
+        .order_by('-total_usd')[:15]
+    )
+    lines.append("\nSales reps by revenue (USD):")
+    for r in rep_stats:
+        lines.append(
+            f"  {r['distributor__salesperson_name']}: "
+            f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units | {r['dist_count']} distributor(s)"
+        )
+
+    context = '\n'.join(lines)
+    cache.set('kpos_ai_context', context, 300)
+    return context
+
+
+def ai_chat(request):
+    """AI assistant chat endpoint (POST only). Session-persisted conversation."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except (ValueError, KeyError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    user_message = (body.get('message') or '').strip()
+    if not user_message:
+        return JsonResponse({'error': 'Empty message'}, status=400)
+
+    api_key = getattr(django_settings, 'CLAUDE_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'reply': 'AI assistant is not configured yet.', 'wants_export': False})
+
+    data_context = _build_ai_context()
+    today_str = date_cls.today().strftime('%B %d, %Y')
+
+    system_prompt = f"""You are KPOS Assistant, an AI analyst built into Kramer Electronics' KPOS Point-of-Sale analytics platform.
+
+You have access to current, real data from the KPOS database:
+
+{data_context}
+
+Notes:
+- Revenue figures are normalized to USD for cross-distributor comparison.
+- Today's date is {today_str}.
+
+Guidelines:
+- Be concise, precise, and conversational — like a smart business analyst.
+- Format large numbers with commas and $ prefix (e.g., $1,234,567).
+- When comparing distributors or products, reference the specific numbers from the data above.
+- If asked to export or download the data as Excel or spreadsheet, end your reply with exactly the token: [EXPORT_EXCEL]
+- If you don't have enough data to answer something precisely, say so clearly.
+"""
+
+    history = request.session.get('ai_chat_history', [])
+    history.append({'role': 'user', 'content': user_message})
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model='claude-opus-4-8',
+            max_tokens=1024,
+            system=system_prompt,
+            messages=history,
+        )
+        reply = response.content[0].text
+    except Exception as exc:
+        return JsonResponse({'error': f'AI error: {exc}'}, status=500)
+
+    history.append({'role': 'assistant', 'content': reply})
+    if len(history) > 40:
+        history = history[-40:]
+
+    request.session['ai_chat_history'] = history
+    request.session.modified = True
+
+    wants_export = '[EXPORT_EXCEL]' in reply
+    clean_reply = reply.replace('[EXPORT_EXCEL]', '').strip()
+
+    return JsonResponse({'reply': clean_reply, 'wants_export': wants_export})
+
+
+def ai_export(request):
+    """Generate a comprehensive Excel export for the AI assistant download button."""
+    from io import BytesIO
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+
+    hdr_fill = PatternFill(start_color='8200B4', end_color='8200B4', fill_type='solid')
+    hdr_font = Font(color='FFFFFF', bold=True)
+    hdr_align = Alignment(horizontal='center')
+
+    def make_header(ws, headers):
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.fill = hdr_fill
+            cell.font = hdr_font
+            cell.alignment = hdr_align
+
+    def autofit(ws):
+        for col in ws.columns:
+            width = max((len(str(c.value or '')) for c in col), default=10)
+            ws.column_dimensions[get_column_letter(col[0].column)].width = min(width + 4, 50)
+
+    qs = _annotate_converted(POSRecord.objects.all(), 'USD')
+
+    ws1 = wb.active
+    ws1.title = 'Distributor Summary'
+    make_header(ws1, ['Distributor', 'Region', 'Revenue (USD)', 'Units', 'Records'])
+    for d in (
+        qs.values('distributor__name', 'distributor__region')
+        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'), record_count=Count('id'))
+        .order_by('-total_usd')
+    ):
+        ws1.append([
+            d['distributor__name'], d['distributor__region'],
+            float(d['total_usd'] or 0), int(d['total_qty'] or 0), d['record_count'],
+        ])
+    autofit(ws1)
+
+    ws2 = wb.create_sheet('Product Summary')
+    make_header(ws2, ['Product', 'Revenue (USD)', 'Units', 'Distributors'])
+    for p in (
+        qs.exclude(product_name='')
+        .values('product_name')
+        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'), dist_count=Count('distributor', distinct=True))
+        .order_by('-total_usd')[:100]
+    ):
+        ws2.append([
+            p['product_name'],
+            float(p['total_usd'] or 0), int(p['total_qty'] or 0), p['dist_count'],
+        ])
+    autofit(ws2)
+
+    ws3 = wb.create_sheet('Monthly Trend')
+    make_header(ws3, ['Month', 'Revenue (USD)', 'Units'])
+    for m in (
+        qs.annotate(month=TruncMonth('invoice_date'))
+        .values('month')
+        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+        .order_by('month')
+    ):
+        if m['month']:
+            ws3.append([m['month'].strftime('%Y-%m'), float(m['total_usd'] or 0), int(m['total_qty'] or 0)])
+    autofit(ws3)
+
+    ws4 = wb.create_sheet('Customer Summary')
+    make_header(ws4, ['Customer', 'Country', 'Region', 'Revenue (USD)', 'Units'])
+    for c in (
+        qs.exclude(customer_name='')
+        .values('customer_name', 'country', 'distributor__region')
+        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+        .order_by('-total_usd')[:200]
+    ):
+        ws4.append([
+            c['customer_name'], c['country'] or '', c['distributor__region'] or '',
+            float(c['total_usd'] or 0), int(c['total_qty'] or 0),
+        ])
+    autofit(ws4)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    today_str = date_cls.today().strftime('%Y%m%d')
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="KPOS_Export_{today_str}.xlsx"'
+    return response

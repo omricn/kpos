@@ -16,4 +16,6 @@ urlpatterns = [
     path('set-currency/', views.set_currency, name='set_currency'),
     path('set-region/', views.set_region, name='set_region'),
     path('salespersons/', views.salesperson_list, name='salesperson_list'),
+    path('ai-chat/', views.ai_chat, name='ai_chat'),
+    path('ai-export/', views.ai_export, name='ai_export'),
 ]
