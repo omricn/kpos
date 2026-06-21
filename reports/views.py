@@ -1528,7 +1528,7 @@ Notes:
 - Today's date is {today_str}.
 
 Guidelines:
-- Be concise, precise, and conversational — like a smart business analyst.
+- Keep replies short and direct. Answer in 1–3 sentences unless the question genuinely requires more detail. No preamble, no restating the question, no filler.
 - Format large numbers with commas and $ prefix (e.g., $1,234,567).
 - When comparing distributors or products, reference the specific numbers from the data above.
 - If asked to export or download the data as Excel or spreadsheet, end your reply with exactly the token: [EXPORT_EXCEL]
