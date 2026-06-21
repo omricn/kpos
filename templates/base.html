@@ -133,7 +133,7 @@
 
 <!-- AI Assistant -->
 <div id="aiOrb" class="ai-orb" onclick="toggleAiChat()" title="KPOS Assistant">
-  <i class="bi bi-stars"></i>
+  <div class="ai-orb-inner"><i class="bi bi-stars"></i></div>
 </div>
 
 <div id="aiPanel" class="ai-panel" role="dialog" aria-label="KPOS Assistant">
@@ -193,6 +193,7 @@
 })();
 </script>
 <script>
+var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
 // ── AI Assistant ──────────────────────────────────────────────────────────────
 (function () {
   var chatOpen = false;
@@ -209,6 +210,13 @@
     if (chatOpen) {
       panel.classList.add('open');
       orb.style.display = 'none';
+      // First-open greeting
+      if (document.getElementById('aiWelcome')) {
+        var h  = new Date().getHours();
+        var gr = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+        var nm = (typeof KPOS_AI_USER !== 'undefined' && KPOS_AI_USER) ? ', ' + KPOS_AI_USER : '';
+        appendBubble(gr + nm + '. How can I help you today?', 'bot');
+      }
       setTimeout(function () {
         var inp = document.getElementById('aiInput');
         if (inp) inp.focus();
