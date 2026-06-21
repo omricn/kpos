@@ -29,8 +29,8 @@
   <div class="d-flex align-items-center gap-2">
     <select id="distJump" class="form-select form-select-sm" style="min-width:240px">
       <option value="">Jump to distributor…</option>
-      {% for d in all_distributors %}
-      <option value="{% url 'distributor_records' d.pk %}">{{ d.name }}{% if d.region %} ({{ d.region }}){% endif %}</option>
+      {% for d in jump_distributors %}
+      <option value="{% url 'distributor_records' d.pk %}">{{ d.name }}{% if not selected_region %} ({{ d.region }}){% endif %}</option>
       {% endfor %}
     </select>
     <button class="btn btn-kramer btn-sm" onclick="jumpToDist()">Go</button>
