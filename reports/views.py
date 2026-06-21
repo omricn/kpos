@@ -33,7 +33,11 @@ REGION_COLORS = {
 # ── Currency helpers ───────────────────────────────────────────────────────────
 
 def _get_rates():
-    """Return dict {currency: {usd: Decimal, eur: Decimal}}. Auto-refreshes if >24h old."""
+    """Return dict {currency: {usd: Decimal, eur: Decimal}}. Cached 1 h; refreshes from API if DB rates are >24 h old."""
+    cached = cache.get('kpos_get_rates')
+    if cached is not None:
+        return cached
+
     from datetime import timedelta
     threshold = timezone.now() - timedelta(hours=24)
     if not ExchangeRate.objects.filter(fetched_at__gte=threshold).exists():
@@ -60,11 +64,17 @@ def _get_rates():
                     currency=cur,
                     defaults={'rate_to_usd': r_usd, 'rate_to_eur': r_eur},
                 )
+            # Warm the _annotate_converted cache so it doesn't re-query the DB
+            cache.set('kpos_current_rates', {
+                cur: (float(r_usd), float(r_eur))
+                for cur, (r_usd, r_eur) in entries.items()
+            }, 3600)
         except Exception:
             pass
+
     result = {r.currency: {'usd': r.rate_to_usd, 'eur': r.rate_to_eur}
               for r in ExchangeRate.objects.all()}
-    cache.delete('kpos_current_rates')
+    cache.set('kpos_get_rates', result, 3600)  # Cache for 1 h — no DB hit on next 9 page views
     return result
 
 
