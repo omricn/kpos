@@ -1535,10 +1535,11 @@ def _apply_filters(qs, year=None, month=None, quarter=None,
 def _tool_get_top_products(year=None, month=None, quarter=None,
                            distributor_code=None, region=None, sort_by='revenue', limit=10):
     limit = min(int(limit or 10), 30)
-    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
-                        year=year, month=month, quarter=quarter,
-                        distributor_code=distributor_code, region=region)
-    rows = (qs.exclude(manufacturer_part_no='')
+    qs = _apply_filters(
+        POSRecord.objects.exclude(manufacturer_part_no='').filter(invoiced_value__isnull=False),
+        year=year, month=month, quarter=quarter,
+        distributor_code=distributor_code, region=region)
+    rows = (_annotate_converted(qs, 'USD')
             .values('manufacturer_part_no', 'product_description')
             .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
             .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
@@ -1554,9 +1555,11 @@ def _tool_get_top_products(year=None, month=None, quarter=None,
 def _tool_get_top_distributors(year=None, month=None, quarter=None,
                                region=None, sort_by='revenue', limit=10):
     limit = min(int(limit or 10), 30)
-    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
-                        year=year, month=month, quarter=quarter, region=region)
-    rows = (qs.values('distributor__name', 'distributor__region')
+    qs = _apply_filters(
+        POSRecord.objects.filter(invoiced_value__isnull=False),
+        year=year, month=month, quarter=quarter, region=region)
+    rows = (_annotate_converted(qs, 'USD')
+            .values('distributor__name', 'distributor__region')
             .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
             .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
     if not rows:
@@ -1571,10 +1574,11 @@ def _tool_get_top_distributors(year=None, month=None, quarter=None,
 def _tool_get_top_customers(year=None, month=None, quarter=None,
                             distributor_code=None, region=None, country=None, sort_by='revenue', limit=10):
     limit = min(int(limit or 10), 30)
-    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
-                        year=year, month=month, quarter=quarter,
-                        distributor_code=distributor_code, region=region, country=country)
-    rows = (qs.exclude(customer_name='')
+    qs = _apply_filters(
+        POSRecord.objects.exclude(customer_name='').filter(invoiced_value__isnull=False),
+        year=year, month=month, quarter=quarter,
+        distributor_code=distributor_code, region=region, country=country)
+    rows = (_annotate_converted(qs, 'USD')
             .values('customer_name', 'country', 'distributor__region')
             .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
             .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
@@ -1590,10 +1594,11 @@ def _tool_get_top_customers(year=None, month=None, quarter=None,
 def _tool_get_top_sales_reps(year=None, month=None, quarter=None,
                              distributor_code=None, region=None, limit=10):
     limit = min(int(limit or 10), 30)
-    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
-                        year=year, month=month, quarter=quarter,
-                        distributor_code=distributor_code, region=region)
-    rows = (qs.filter(distributor__salesperson_name__gt='')
+    qs = _apply_filters(
+        POSRecord.objects.filter(distributor__salesperson_name__gt='', invoiced_value__isnull=False),
+        year=year, month=month, quarter=quarter,
+        distributor_code=distributor_code, region=region)
+    rows = (_annotate_converted(qs, 'USD')
             .values('distributor__salesperson_name', 'distributor__region')
             .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
             .order_by('-total_usd')[:limit])
@@ -1607,10 +1612,12 @@ def _tool_get_top_sales_reps(year=None, month=None, quarter=None,
 
 
 def _tool_get_revenue_trend(year=None, distributor_code=None, region=None, product_name=None):
-    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
-                        year=year, distributor_code=distributor_code,
-                        region=region, product_name=product_name)
-    rows = (qs.annotate(month=TruncMonth('invoice_date'))
+    qs = _apply_filters(
+        POSRecord.objects.filter(invoiced_value__isnull=False),
+        year=year, distributor_code=distributor_code,
+        region=region, product_name=product_name)
+    rows = (_annotate_converted(qs, 'USD')
+            .annotate(month=TruncMonth('invoice_date'))
             .values('month')
             .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
             .order_by('month'))
@@ -1624,10 +1631,11 @@ def _tool_get_revenue_trend(year=None, distributor_code=None, region=None, produ
 
 
 def _tool_get_summary(year=None, month=None, quarter=None, distributor_code=None, region=None):
-    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
-                        year=year, month=month, quarter=quarter,
-                        distributor_code=distributor_code, region=region)
-    agg = qs.aggregate(
+    qs = _apply_filters(
+        POSRecord.objects.filter(invoiced_value__isnull=False),
+        year=year, month=month, quarter=quarter,
+        distributor_code=distributor_code, region=region)
+    agg = _annotate_converted(qs, 'USD').aggregate(
         total_usd=Sum('converted_value'), total_qty=Sum('quantity'),
         record_count=Count('id'),
         customer_count=Count('customer_name', distinct=True),
