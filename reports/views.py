@@ -6,6 +6,7 @@ from datetime import date as date_cls, timedelta
 from datetime import datetime as dt_class
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.core.cache import cache
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, F, DecimalField, ExpressionWrapper, Value, Subquery, OuterRef
 from django.db.models.functions import TruncMonth, TruncWeek, ExtractYear, ExtractMonth
 from django.db.models.functions import Coalesce
@@ -34,7 +35,7 @@ def _get_rates():
     """Return dict {currency: {usd: Decimal, eur: Decimal}}. Auto-refreshes if >24h old."""
     from datetime import timedelta
     threshold = timezone.now() - timedelta(hours=24)
-    if ExchangeRate.objects.filter(fetched_at__gte=threshold).count() < 4:
+    if not ExchangeRate.objects.filter(fetched_at__gte=threshold).exists():
         try:
             import urllib.request
             import json as _json
@@ -60,43 +61,56 @@ def _get_rates():
                 )
         except Exception:
             pass
-    return {r.currency: {'usd': r.rate_to_usd, 'eur': r.rate_to_eur}
-            for r in ExchangeRate.objects.all()}
+    result = {r.currency: {'usd': r.rate_to_usd, 'eur': r.rate_to_eur}
+              for r in ExchangeRate.objects.all()}
+    cache.delete('kpos_current_rates')
+    return result
 
 
 def _annotate_converted(qs, target, rates=None):
-    """Annotate queryset with converted_value using historical monthly rates.
+    """Annotate queryset with converted_value using a CASE/WHEN built from cached rates.
 
-    Looks up MonthlyRate for each record's (year, month, currency); falls back
-    to current ExchangeRate if no historical rate exists for that period.
-    The `rates` param is kept for backward compatibility but is no longer used.
+    Replaces correlated subqueries (one per row) with a single CASE expression
+    compiled from preloaded monthly + current rates — dramatically faster on large tables.
     """
-    rate_field = 'rate_to_usd' if target == 'USD' else 'rate_to_eur'
+    field_idx = 0 if target == 'USD' else 1
 
-    monthly_subq = MonthlyRate.objects.filter(
-        year=ExtractYear(OuterRef('invoice_date')),
-        month=ExtractMonth(OuterRef('invoice_date')),
-        currency=OuterRef('currency'),
-    ).values(rate_field)[:1]
+    # Load monthly rates from cache (small table, rarely changes)
+    monthly_rates = cache.get('kpos_monthly_rates')
+    if monthly_rates is None:
+        monthly_rates = {
+            (r.year, r.month, r.currency): (float(r.rate_to_usd), float(r.rate_to_eur))
+            for r in MonthlyRate.objects.all()
+        }
+        cache.set('kpos_monthly_rates', monthly_rates, 86400)
 
-    current_subq = ExchangeRate.objects.filter(
-        currency=OuterRef('currency'),
-    ).values(rate_field)[:1]
+    current_rates = cache.get('kpos_current_rates')
+    if current_rates is None:
+        current_rates = {
+            r.currency: (float(r.rate_to_usd), float(r.rate_to_eur))
+            for r in ExchangeRate.objects.all()
+        }
+        cache.set('kpos_current_rates', current_rates, 3600)
 
-    return (
-        qs
-        .annotate(
-            _hist_rate=Subquery(monthly_subq, output_field=DecimalField(max_digits=12, decimal_places=6)),
-            _curr_rate=Subquery(current_subq, output_field=DecimalField(max_digits=12, decimal_places=6)),
-        )
-        .annotate(
-            converted_value=ExpressionWrapper(
-                F('invoiced_value') * Coalesce(
-                    F('_hist_rate'), F('_curr_rate'), Value(Decimal('1')),
-                    output_field=DecimalField(max_digits=12, decimal_places=6),
-                ),
-                output_field=DecimalField(max_digits=15, decimal_places=4),
-            )
+    _df = DecimalField(max_digits=12, decimal_places=6)
+    cases = []
+    for (year, month, currency), rate_pair in monthly_rates.items():
+        cases.append(When(
+            invoice_date__year=year, invoice_date__month=month, currency=currency,
+            then=Value(Decimal(str(rate_pair[field_idx])), output_field=_df),
+        ))
+    for currency, rate_pair in current_rates.items():
+        cases.append(When(
+            currency=currency,
+            then=Value(Decimal(str(rate_pair[field_idx])), output_field=_df),
+        ))
+
+    rate_expr = Case(*cases, default=Value(Decimal('1'), output_field=_df), output_field=_df)
+
+    return qs.annotate(
+        converted_value=ExpressionWrapper(
+            F('invoiced_value') * rate_expr,
+            output_field=DecimalField(max_digits=15, decimal_places=4),
         )
     )
 
@@ -752,6 +766,7 @@ def distributor_list(request):
         'labels': [d['distributor__name'] for d in chart_items],
         'revenue': [d['revenue'] for d in chart_items],
         'colors': [d['color'] for d in chart_items],
+        'pks': [d['pk'] for d in chart_items],
     })
 
     filtered_distributors = None

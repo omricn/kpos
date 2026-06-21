@@ -65,7 +65,7 @@ class POSRecord(models.Model):
     vendor = models.CharField(max_length=200, blank=True)
     quantity = models.IntegerField(null=True, blank=True)
     invoiced_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    currency = models.CharField(max_length=10, blank=True)
+    currency = models.CharField(max_length=10, blank=True, db_index=True)
     invoice_date = models.DateField(null=True, blank=True, db_index=True)
     invoice_ref = models.CharField(max_length=100, blank=True)
     sda_number = models.CharField(max_length=100, blank=True)

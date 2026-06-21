@@ -97,7 +97,7 @@
 
 {% if not selected_region %}
 <!-- ── Region cards ────────────────────────────────────────────── -->
-<div class="row g-3">
+<div class="row g-3 justify-content-center">
   {% for r in region_stats %}
   <div class="col-md-4 col-xl-3">
     <a href="?region={{ r.name|urlencode }}" class="text-decoration-none">
@@ -125,6 +125,15 @@
   </div>
   {% endfor %}
 </div>
+
+{% if chart_data %}
+<div class="card border-0 shadow-sm mt-4">
+  <div class="card-body p-3">
+    <h6 class="mb-3 fw-bold">Revenue by Distributor</h6>
+    <div style="position:relative;height:320px"><canvas id="distOverviewChart"></canvas></div>
+  </div>
+</div>
+{% endif %}
 
 {% else %}
 <!-- ── Region dashboard ───────────────────────────────────────── -->
@@ -296,6 +305,44 @@ document.getElementById('distJump').addEventListener('change', function() {
     });
   });
 })();
+
+{% if not selected_region and chart_data %}
+(function() {
+  const raw = {{ chart_data|safe }};
+  const currSym = '{{ currency_symbol }}';
+  function fmtMoney(v) {
+    if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
+    return currSym + Math.round(v).toLocaleString();
+  }
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const tickColor = isDark ? '#636366' : '#666';
+  new Chart(document.getElementById('distOverviewChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: raw.labels,
+      datasets: [{ data: raw.revenue, backgroundColor: raw.colors, borderRadius: 4, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + fmtMoney(ctx.parsed.y) } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 35, font: { size: 11 }, color: tickColor } },
+        y: { grid: { color: isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
+             ticks: { callback: v => fmtMoney(v), color: tickColor } }
+      },
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const pk = raw.pks[elements[0].index];
+        if (pk) window.location.href = `/distributor/${pk}/`;
+      }
+    }
+  });
+})();
+{% endif %}
 
 {% if selected_region and chart_data %}
 (function() {

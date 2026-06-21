@@ -206,7 +206,7 @@
     <div class="d-flex align-items-center justify-content-between mb-3">
       <h6 class="mb-0 fw-bold">Revenue by Month</h6>
       <div class="btn-group btn-group-sm" id="chartTypeToggle">
-        <button class="btn btn-outline-secondary" data-type="area"><i class="bi bi-activity me-1"></i>Wave</button>
+        <button class="btn btn-outline-secondary" data-type="line"><i class="bi bi-graph-up me-1"></i>Line</button>
         <button class="btn btn-outline-secondary active" data-type="bar"><i class="bi bi-bar-chart-fill me-1"></i>Bar</button>
       </div>
     </div>
@@ -339,13 +339,14 @@ let revenueChart = null;
 
 function buildRevenueChart(type) {
   if (revenueChart) revenueChart.destroy();
-  const isArea = type === 'area';
+  const isBar  = type === 'bar';
+  const isLine = type === 'line';
   rawData.datasets.forEach(ds => {
-    if (isArea) {
-      ds.fill = true; ds.tension = 0.4; ds.pointRadius = 3;
-      ds.borderWidth = 2; ds.backgroundColor = ds._color + 'aa';
+    if (isLine) {
+      ds.fill = false; ds.tension = 0.35; ds.pointRadius = 3; ds.pointHoverRadius = 5;
+      ds.borderWidth = 2.5; ds.backgroundColor = ds._color + '22';
       ds.borderColor = ds._color; ds.borderRadius = undefined;
-    } else {
+    } else if (isBar) {
       ds.fill = false; ds.tension = 0; ds.pointRadius = 0;
       ds.borderWidth = 0; ds.backgroundColor = ds._color;
       ds.borderColor = ds._color; ds.borderRadius = 4;
@@ -355,7 +356,7 @@ function buildRevenueChart(type) {
   const gridColor = isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
   const tickColor = isDark ? '#636366' : '#666';
   revenueChart = new Chart(document.getElementById('revenueChart').getContext('2d'), {
-    type: isArea ? 'line' : 'bar',
+    type: isBar ? 'bar' : 'line',
     data: rawData,
     options: {
       responsive: true,
@@ -386,8 +387,8 @@ function buildRevenueChart(type) {
         }
       },
       scales: {
-        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 12 }, color: tickColor } },
-        y: { stacked: true, grid: { color: gridColor }, ticks: { font: { size: 11 }, color: tickColor, callback: v => fmtMoney(v) } }
+        x: { stacked: isBar, grid: { display: false }, ticks: { font: { size: 12 }, color: tickColor } },
+        y: { stacked: isBar, grid: { color: gridColor }, ticks: { font: { size: 11 }, color: tickColor, callback: v => fmtMoney(v) } }
       }
     }
   });
