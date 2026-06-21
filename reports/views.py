@@ -458,7 +458,7 @@ def dashboard(request):
         d['share_pct']  = round(d['revenue_f'] / total_dist_rev * 100, 1)
 
     all_regions      = Distributor.objects.exclude(region='').values_list('region', flat=True).distinct().order_by('region')
-    all_distributors = Distributor.objects.all().order_by('name')
+    all_distributors = (Distributor.objects.filter(region=region) if region else Distributor.objects.all()).order_by('name')
 
     # User greeting
     if request.user.is_authenticated:
