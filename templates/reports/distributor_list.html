@@ -356,12 +356,17 @@ document.getElementById('distJump').addEventListener('change', function() {
     });
   }
 
-  buildDistChart('bar');
+  const savedDistType = localStorage.getItem('kpos_chart_type') || 'bar';
+  document.querySelectorAll('#distChartToggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === savedDistType);
+  });
+  buildDistChart(savedDistType);
 
   document.querySelectorAll('#distChartToggle button').forEach(btn => {
     btn.addEventListener('click', function() {
       document.querySelectorAll('#distChartToggle button').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
+      localStorage.setItem('kpos_chart_type', this.dataset.type);
       buildDistChart(this.dataset.type);
     });
   });

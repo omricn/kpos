@@ -394,7 +394,11 @@ function buildRevenueChart(type) {
   });
 }
 
-buildRevenueChart('bar');
+const savedChartType = localStorage.getItem('kpos_chart_type') || 'bar';
+document.querySelectorAll('#chartTypeToggle button').forEach(b => {
+  b.classList.toggle('active', b.dataset.type === savedChartType);
+});
+buildRevenueChart(savedChartType);
 
 window.onThemeChange = function() { buildRevenueChart(document.querySelector('#chartTypeToggle .active').dataset.type); };
 
@@ -402,6 +406,7 @@ document.querySelectorAll('#chartTypeToggle button').forEach(btn => {
   btn.addEventListener('click', function() {
     document.querySelectorAll('#chartTypeToggle button').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
+    localStorage.setItem('kpos_chart_type', this.dataset.type);
     buildRevenueChart(this.dataset.type);
   });
 });
