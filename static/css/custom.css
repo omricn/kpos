@@ -467,8 +467,8 @@ h1, h2, h3, h4, h5, h6 {
   position: fixed;
   top: 160px;
   right: 20px;
-  width: 62px;
-  height: 62px;
+  width: 66px;
+  height: 66px;
   border-radius: 62% 38% 32% 68% / 58% 34% 66% 42%;
   background: conic-gradient(
     from 0deg,
@@ -506,6 +506,7 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
   flex-shrink: 0;
   animation: ai-orb-spin-reverse 9s linear infinite;
+  box-shadow: 0 0 0 6px rgba(130, 0, 180, 0.13);
 }
 
 .ai-panel {

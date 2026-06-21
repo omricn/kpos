@@ -132,7 +132,7 @@
 </main>
 
 <!-- AI Assistant -->
-<div id="aiOrb" class="ai-orb" onclick="toggleAiChat()" title="KPOS Assistant">
+<div id="aiOrb" class="ai-orb" onclick="handleOrbClick(event)" title="KPOS Assistant">
   <div class="ai-orb-inner"><i class="bi bi-stars"></i></div>
 </div>
 
@@ -197,20 +197,41 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
 // ── AI Assistant ──────────────────────────────────────────────────────────────
 (function () {
   var chatOpen = false;
+  var ORB_SIZE = 66;
 
   function getCsrf() {
     var m = document.cookie.match(/csrftoken=([^;]+)/);
     return m ? m[1] : '';
   }
 
+  function positionOrbToCard() {
+    var firstCard = document.querySelector('main .card');
+    if (!firstCard) return;
+    var rect     = firstCard.getBoundingClientRect();
+    var gap      = Math.max(Math.round((rect.height - ORB_SIZE) / 2), 4);
+    var newTop   = Math.round(rect.top + gap);
+    var newRight = Math.round(window.innerWidth - rect.right - gap);
+    var orbEl    = document.getElementById('aiOrb');
+    var panelEl  = document.getElementById('aiPanel');
+    orbEl.style.top     = newTop   + 'px';
+    orbEl.style.right   = newRight + 'px';
+    panelEl.style.top   = newTop   + 'px';
+    panelEl.style.right = newRight + 'px';
+  }
+
+  window.handleOrbClick = function (e) {
+    e.stopPropagation();
+    window.toggleAiChat();
+  };
+
   window.toggleAiChat = function () {
     var panel = document.getElementById('aiPanel');
     var orb   = document.getElementById('aiOrb');
     chatOpen = !chatOpen;
     if (chatOpen) {
+      positionOrbToCard();
       panel.classList.add('open');
       orb.style.display = 'none';
-      // First-open greeting
       if (document.getElementById('aiWelcome')) {
         var h  = new Date().getHours();
         var gr = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
@@ -226,6 +247,19 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
       setTimeout(function () { orb.style.display = ''; }, 220);
     }
   };
+
+  // Close panel when clicking outside it (conversation preserved in DOM)
+  document.addEventListener('click', function (e) {
+    if (!chatOpen) return;
+    var panel = document.getElementById('aiPanel');
+    if (panel && !panel.contains(e.target)) {
+      window.toggleAiChat();
+    }
+  });
+
+  // Prevent clicks inside panel from bubbling to the outside-click handler
+  var panelEl = document.getElementById('aiPanel');
+  if (panelEl) panelEl.addEventListener('click', function (e) { e.stopPropagation(); });
 
   window.sendAiMessage = function () {
     var input = document.getElementById('aiInput');
@@ -301,6 +335,9 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
     var el = document.getElementById(id);
     if (el) el.remove();
   }
+
+  requestAnimationFrame(positionOrbToCard);
+  window.addEventListener('resize', positionOrbToCard);
 })();
 </script>
 {% block extra_js %}{% endblock %}
