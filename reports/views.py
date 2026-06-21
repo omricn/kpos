@@ -1525,7 +1525,10 @@ def _apply_filters(qs, year=None, month=None, quarter=None,
     if country:
         qs = qs.filter(country__icontains=str(country))
     if product_name:
-        qs = qs.filter(product_name__icontains=str(product_name))
+        qs = qs.filter(
+            Q(manufacturer_part_no__icontains=str(product_name)) |
+            Q(product_description__icontains=str(product_name))
+        )
     return qs
 
 
@@ -1535,14 +1538,15 @@ def _tool_get_top_products(year=None, month=None, quarter=None,
     qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
                         year=year, month=month, quarter=quarter,
                         distributor_code=distributor_code, region=region)
-    rows = (qs.exclude(product_name='')
-            .values('product_name')
+    rows = (qs.exclude(manufacturer_part_no='')
+            .values('manufacturer_part_no', 'product_description')
             .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
             .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
     if not rows:
         return "No product data found for those filters."
     return '\n'.join(
-        f"{i}. {r['product_name']}: ${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
+        f"{i}. {r['manufacturer_part_no']} ({r['product_description'] or 'no description'}): "
+        f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
         for i, r in enumerate(rows, 1)
     )
 
@@ -1628,7 +1632,7 @@ def _tool_get_summary(year=None, month=None, quarter=None, distributor_code=None
         record_count=Count('id'),
         customer_count=Count('customer_name', distinct=True),
         distributor_count=Count('distributor', distinct=True),
-        product_count=Count('product_name', distinct=True),
+        product_count=Count('manufacturer_part_no', distinct=True),
     )
     dates = qs.aggregate(min_date=Min('invoice_date'), max_date=Max('invoice_date'))
     return '\n'.join([
@@ -1804,15 +1808,15 @@ def ai_export(request):
     autofit(ws1)
 
     ws2 = wb.create_sheet('Product Summary')
-    make_header(ws2, ['Product', 'Revenue (USD)', 'Units', 'Distributors'])
+    make_header(ws2, ['Part No', 'Description', 'Revenue (USD)', 'Units', 'Distributors'])
     for p in (
-        qs.exclude(product_name='')
-        .values('product_name')
+        qs.exclude(manufacturer_part_no='')
+        .values('manufacturer_part_no', 'product_description')
         .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'), dist_count=Count('distributor', distinct=True))
         .order_by('-total_usd')[:100]
     ):
         ws2.append([
-            p['product_name'],
+            p['manufacturer_part_no'], p['product_description'] or '',
             float(p['total_usd'] or 0), int(p['total_qty'] or 0), p['dist_count'],
         ])
     autofit(ws2)
