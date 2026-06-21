@@ -126,6 +126,41 @@ def _annotate_converted(qs, target, rates=None):
     )
 
 
+def _usd_sum_expr():
+    """Return Sum(invoiced_value * usd_rate) as a single expression safe for GROUP BY queries."""
+    monthly_rates = cache.get('kpos_monthly_rates')
+    if monthly_rates is None:
+        monthly_rates = {
+            (r.year, r.month, r.currency): (float(r.rate_to_usd), float(r.rate_to_eur))
+            for r in MonthlyRate.objects.all()
+        }
+        cache.set('kpos_monthly_rates', monthly_rates, 86400)
+    current_rates = cache.get('kpos_current_rates')
+    if current_rates is None:
+        current_rates = {
+            r.currency: (float(r.rate_to_usd), float(r.rate_to_eur))
+            for r in ExchangeRate.objects.all()
+        }
+        cache.set('kpos_current_rates', current_rates, 3600)
+    _df = DecimalField(max_digits=12, decimal_places=6)
+    cases = []
+    for (year, month, currency), rate_pair in monthly_rates.items():
+        cases.append(When(
+            invoice_date__year=year, invoice_date__month=month, currency=currency,
+            then=Value(Decimal(str(rate_pair[0])), output_field=_df),
+        ))
+    for currency, rate_pair in current_rates.items():
+        cases.append(When(
+            currency=currency,
+            then=Value(Decimal(str(rate_pair[0])), output_field=_df),
+        ))
+    rate_expr = Case(*cases, default=Value(Decimal('1'), output_field=_df), output_field=_df)
+    return Sum(
+        ExpressionWrapper(F('invoiced_value') * rate_expr,
+                          output_field=DecimalField(max_digits=15, decimal_places=4))
+    )
+
+
 def _currency_symbol(currency):
     return '€' if currency == 'EUR' else '$'
 
@@ -1539,10 +1574,10 @@ def _tool_get_top_products(year=None, month=None, quarter=None,
         POSRecord.objects.exclude(manufacturer_part_no='').filter(invoiced_value__isnull=False),
         year=year, month=month, quarter=quarter,
         distributor_code=distributor_code, region=region)
-    rows = (_annotate_converted(qs, 'USD')
-            .values('manufacturer_part_no', 'product_description')
-            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-            .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
+    order = '-total_usd' if sort_by != 'units' else '-total_qty'
+    rows = (qs.values('manufacturer_part_no', 'product_description')
+              .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+              .order_by(order)[:limit])
     if not rows:
         return "No product data found for those filters."
     return '\n'.join(
@@ -1558,10 +1593,10 @@ def _tool_get_top_distributors(year=None, month=None, quarter=None,
     qs = _apply_filters(
         POSRecord.objects.filter(invoiced_value__isnull=False),
         year=year, month=month, quarter=quarter, region=region)
-    rows = (_annotate_converted(qs, 'USD')
-            .values('distributor__name', 'distributor__region')
-            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-            .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
+    order = '-total_usd' if sort_by != 'units' else '-total_qty'
+    rows = (qs.values('distributor__name', 'distributor__region')
+              .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+              .order_by(order)[:limit])
     if not rows:
         return "No distributor data found for those filters."
     return '\n'.join(
@@ -1578,10 +1613,10 @@ def _tool_get_top_customers(year=None, month=None, quarter=None,
         POSRecord.objects.exclude(customer_name='').filter(invoiced_value__isnull=False),
         year=year, month=month, quarter=quarter,
         distributor_code=distributor_code, region=region, country=country)
-    rows = (_annotate_converted(qs, 'USD')
-            .values('customer_name', 'country', 'distributor__region')
-            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-            .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
+    order = '-total_usd' if sort_by != 'units' else '-total_qty'
+    rows = (qs.values('customer_name', 'country', 'distributor__region')
+              .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+              .order_by(order)[:limit])
     if not rows:
         return "No customer data found for those filters."
     return '\n'.join(
@@ -1598,10 +1633,9 @@ def _tool_get_top_sales_reps(year=None, month=None, quarter=None,
         POSRecord.objects.filter(distributor__salesperson_name__gt='', invoiced_value__isnull=False),
         year=year, month=month, quarter=quarter,
         distributor_code=distributor_code, region=region)
-    rows = (_annotate_converted(qs, 'USD')
-            .values('distributor__salesperson_name', 'distributor__region')
-            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-            .order_by('-total_usd')[:limit])
+    rows = (qs.values('distributor__salesperson_name', 'distributor__region')
+              .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+              .order_by('-total_usd')[:limit])
     if not rows:
         return "No sales rep data found for those filters."
     return '\n'.join(
@@ -1616,11 +1650,10 @@ def _tool_get_revenue_trend(year=None, distributor_code=None, region=None, produ
         POSRecord.objects.filter(invoiced_value__isnull=False),
         year=year, distributor_code=distributor_code,
         region=region, product_name=product_name)
-    rows = (_annotate_converted(qs, 'USD')
-            .annotate(month=TruncMonth('invoice_date'))
-            .values('month')
-            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-            .order_by('month'))
+    rows = (qs.annotate(month=TruncMonth('invoice_date'))
+              .values('month')
+              .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+              .order_by('month'))
     if not rows:
         return "No trend data found for those filters."
     lines = ["Month | Revenue (USD) | Units"]
@@ -1635,8 +1668,8 @@ def _tool_get_summary(year=None, month=None, quarter=None, distributor_code=None
         POSRecord.objects.filter(invoiced_value__isnull=False),
         year=year, month=month, quarter=quarter,
         distributor_code=distributor_code, region=region)
-    agg = _annotate_converted(qs, 'USD').aggregate(
-        total_usd=Sum('converted_value'), total_qty=Sum('quantity'),
+    agg = qs.aggregate(
+        total_usd=_usd_sum_expr(), total_qty=Sum('quantity'),
         record_count=Count('id'),
         customer_count=Count('customer_name', distinct=True),
         distributor_count=Count('distributor', distinct=True),
