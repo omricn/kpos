@@ -4,8 +4,7 @@ set REGISTRY=kdeskregistry.azurecr.io
 set RG=KPOS
 set APP=kpos
 
-for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DT=%%I
-set TAG=%DT:~0,8%-%DT:~8,4%
+for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd-HHmm'"') do set TAG=%%i
 set IMAGE=%REGISTRY%/kpos:%TAG%
 
 echo =^> Tag: %TAG%
