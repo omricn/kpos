@@ -1395,131 +1395,273 @@ def weekly_view(request):
 # ── AI Assistant ──────────────────────────────────────────────────────────────
 
 def _build_ai_context():
-    """Aggregate DB snapshot for the AI assistant system prompt. Cached 5 min."""
+    """Minimal metadata for the AI system prompt (date range + distributor list). Cached 5 min."""
     cached = cache.get('kpos_ai_context')
     if cached:
         return cached
 
-    lines = []
-
-    dates = POSRecord.objects.aggregate(
-        min_date=Min('invoice_date'),
-        max_date=Max('invoice_date'),
-        total_records=Count('id'),
-    )
-    lines.append(f"Data range: {dates['min_date']} to {dates['max_date']}")
-    lines.append(f"Total records: {dates['total_records']:,}")
-
+    dates = POSRecord.objects.aggregate(min_date=Min('invoice_date'), max_date=Max('invoice_date'))
     distributors = list(Distributor.objects.values('name', 'region', 'code').order_by('region', 'name'))
-    lines.append(f"\nDistributors ({len(distributors)} total):")
+    lines = [
+        f"Database date range: {dates['min_date']} to {dates['max_date']}",
+        f"\nDistributors ({len(distributors)} total — use code for filtering):",
+    ]
     for d in distributors:
-        lines.append(f"  {d['name']} (Region: {d['region']}, Code: {d['code']})")
-
-    qs = _annotate_converted(POSRecord.objects.all(), 'USD')
-
-    dist_stats = (
-        qs.values('distributor__name', 'distributor__region')
-        .annotate(
-            total_usd=Sum('converted_value'),
-            total_qty=Sum('quantity'),
-            record_count=Count('id'),
-        )
-        .order_by('-total_usd')
-    )
-    lines.append("\nDistributor revenue (USD equivalent):")
-    for d in dist_stats:
-        lines.append(
-            f"  {d['distributor__name']} ({d['distributor__region']}): "
-            f"${d['total_usd'] or 0:,.0f} | {d['total_qty'] or 0:,} units | {d['record_count']:,} records"
-        )
-
-    top_products = (
-        qs.exclude(product_name='')
-        .values('product_name')
-        .annotate(
-            total_usd=Sum('converted_value'),
-            total_qty=Sum('quantity'),
-            dist_count=Count('distributor', distinct=True),
-        )
-        .order_by('-total_usd')[:30]
-    )
-    lines.append("\nTop 30 products by revenue (USD):")
-    for p in top_products:
-        lines.append(
-            f"  {p['product_name']}: ${p['total_usd'] or 0:,.0f} | "
-            f"{p['total_qty'] or 0:,} units | {p['dist_count']} distributor(s)"
-        )
-
-    monthly = (
-        qs.annotate(month=TruncMonth('invoice_date'))
-        .values('month')
-        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-        .order_by('month')
-    )
-    lines.append("\nMonthly trend (USD):")
-    for m in monthly:
-        if m['month']:
-            lines.append(f"  {m['month'].strftime('%Y-%m')}: ${m['total_usd'] or 0:,.0f} | {m['total_qty'] or 0:,} units")
-
-    monthly_products_qs = (
-        qs.exclude(product_name='')
-        .annotate(month=TruncMonth('invoice_date'))
-        .values('month', 'product_name')
-        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-        .order_by('month', '-total_usd')
-    )
-    lines.append("\nTop products per month:")
-    cur_month = None
-    month_prod_count = 0
-    for row in monthly_products_qs:
-        if row['month'] != cur_month:
-            cur_month = row['month']
-            month_prod_count = 0
-            if cur_month:
-                lines.append(f"  {cur_month.strftime('%Y-%m')}:")
-        if month_prod_count < 10 and cur_month:
-            lines.append(
-                f"    {row['product_name']}: ${row['total_usd'] or 0:,.0f} | {row['total_qty'] or 0:,} units"
-            )
-            month_prod_count += 1
-
-    top_customers = (
-        qs.exclude(customer_name='')
-        .values('customer_name', 'country', 'distributor__region')
-        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-        .order_by('-total_usd')[:25]
-    )
-    lines.append("\nTop 25 customers by revenue (USD):")
-    for c in top_customers:
-        lines.append(
-            f"  {c['customer_name']} ({c['country'] or 'unknown'}, {c['distributor__region']}): "
-            f"${c['total_usd'] or 0:,.0f} | {c['total_qty'] or 0:,} units"
-        )
-
-    rep_stats = (
-        qs.filter(distributor__salesperson_name__gt='')
-        .values('distributor__salesperson_name')
-        .annotate(
-            total_usd=Sum('converted_value'),
-            total_qty=Sum('quantity'),
-            dist_count=Count('distributor', distinct=True),
-        )
-        .order_by('-total_usd')[:15]
-    )
-    lines.append("\nSales reps by revenue (USD):")
-    for r in rep_stats:
-        lines.append(
-            f"  {r['distributor__salesperson_name']}: "
-            f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units | {r['dist_count']} distributor(s)"
-        )
-
+        lines.append(f"  {d['name']} | region: {d['region']} | code: {d['code']}")
     context = '\n'.join(lines)
     cache.set('kpos_ai_context', context, 300)
     return context
 
 
+# ── Tool definitions ───────────────────────────────────────────────────────────
+
+KPOS_TOOLS = [
+    {
+        "name": "get_top_products",
+        "description": "Get top-selling products ranked by revenue or units. Filter by any combination of time period, distributor, or region.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "year":             {"type": "integer", "description": "Filter by year (e.g. 2026)"},
+                "month":            {"type": "integer", "description": "Filter by month number 1–12"},
+                "quarter":          {"type": "integer", "description": "Filter by quarter 1–4"},
+                "distributor_code": {"type": "string",  "description": "Distributor code (e.g. 'cdev')"},
+                "region":           {"type": "string",  "description": "Region name (e.g. 'EMEA')"},
+                "sort_by":          {"type": "string",  "enum": ["revenue", "units"]},
+                "limit":            {"type": "integer", "description": "Max results, default 10"},
+            },
+        },
+    },
+    {
+        "name": "get_top_distributors",
+        "description": "Get top distributors ranked by revenue or units. Filter by time period or region.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "year":    {"type": "integer"},
+                "month":   {"type": "integer"},
+                "quarter": {"type": "integer"},
+                "region":  {"type": "string"},
+                "sort_by": {"type": "string", "enum": ["revenue", "units"]},
+                "limit":   {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "get_top_customers",
+        "description": "Get top customers ranked by revenue or units. Filter by time period, distributor, region, or country.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "year":             {"type": "integer"},
+                "month":            {"type": "integer"},
+                "quarter":          {"type": "integer"},
+                "distributor_code": {"type": "string"},
+                "region":           {"type": "string"},
+                "country":          {"type": "string", "description": "Country name (partial match)"},
+                "sort_by":          {"type": "string", "enum": ["revenue", "units"]},
+                "limit":            {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "get_top_sales_reps",
+        "description": "Get sales representative performance ranked by revenue. Filter by time period, distributor, or region.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "year":             {"type": "integer"},
+                "month":            {"type": "integer"},
+                "quarter":          {"type": "integer"},
+                "distributor_code": {"type": "string"},
+                "region":           {"type": "string"},
+                "limit":            {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "get_revenue_trend",
+        "description": "Get month-by-month revenue and units trend. Filter by year, distributor, region, or product.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "year":             {"type": "integer"},
+                "distributor_code": {"type": "string"},
+                "region":           {"type": "string"},
+                "product_name":     {"type": "string", "description": "Product name partial match"},
+            },
+        },
+    },
+    {
+        "name": "get_summary",
+        "description": "Get KPI summary: total revenue, units, customer count, product count. Filter by any time period, distributor, or region.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "year":             {"type": "integer"},
+                "month":            {"type": "integer"},
+                "quarter":          {"type": "integer"},
+                "distributor_code": {"type": "string"},
+                "region":           {"type": "string"},
+            },
+        },
+    },
+]
+
+
+def _apply_filters(qs, year=None, month=None, quarter=None,
+                   distributor_code=None, region=None, country=None, product_name=None):
+    if year:
+        qs = qs.filter(invoice_date__year=int(year))
+    if month:
+        qs = qs.filter(invoice_date__month=int(month))
+    if quarter:
+        q_months = {1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12]}
+        qs = qs.filter(invoice_date__month__in=q_months.get(int(quarter), []))
+    if distributor_code:
+        qs = qs.filter(distributor__code__iexact=str(distributor_code))
+    if region:
+        qs = qs.filter(distributor__region__iexact=str(region))
+    if country:
+        qs = qs.filter(country__icontains=str(country))
+    if product_name:
+        qs = qs.filter(product_name__icontains=str(product_name))
+    return qs
+
+
+def _tool_get_top_products(year=None, month=None, quarter=None,
+                           distributor_code=None, region=None, sort_by='revenue', limit=10):
+    limit = min(int(limit or 10), 30)
+    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
+                        year=year, month=month, quarter=quarter,
+                        distributor_code=distributor_code, region=region)
+    rows = (qs.exclude(product_name='')
+            .values('product_name')
+            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+            .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
+    if not rows:
+        return "No product data found for those filters."
+    return '\n'.join(
+        f"{i}. {r['product_name']}: ${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
+        for i, r in enumerate(rows, 1)
+    )
+
+
+def _tool_get_top_distributors(year=None, month=None, quarter=None,
+                               region=None, sort_by='revenue', limit=10):
+    limit = min(int(limit or 10), 30)
+    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
+                        year=year, month=month, quarter=quarter, region=region)
+    rows = (qs.values('distributor__name', 'distributor__region')
+            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+            .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
+    if not rows:
+        return "No distributor data found for those filters."
+    return '\n'.join(
+        f"{i}. {r['distributor__name']} ({r['distributor__region']}): "
+        f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
+        for i, r in enumerate(rows, 1)
+    )
+
+
+def _tool_get_top_customers(year=None, month=None, quarter=None,
+                            distributor_code=None, region=None, country=None, sort_by='revenue', limit=10):
+    limit = min(int(limit or 10), 30)
+    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
+                        year=year, month=month, quarter=quarter,
+                        distributor_code=distributor_code, region=region, country=country)
+    rows = (qs.exclude(customer_name='')
+            .values('customer_name', 'country', 'distributor__region')
+            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+            .order_by('-total_usd' if sort_by != 'units' else '-total_qty')[:limit])
+    if not rows:
+        return "No customer data found for those filters."
+    return '\n'.join(
+        f"{i}. {r['customer_name']} ({r['country'] or '—'}, {r['distributor__region']}): "
+        f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
+        for i, r in enumerate(rows, 1)
+    )
+
+
+def _tool_get_top_sales_reps(year=None, month=None, quarter=None,
+                             distributor_code=None, region=None, limit=10):
+    limit = min(int(limit or 10), 30)
+    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
+                        year=year, month=month, quarter=quarter,
+                        distributor_code=distributor_code, region=region)
+    rows = (qs.filter(distributor__salesperson_name__gt='')
+            .values('distributor__salesperson_name', 'distributor__region')
+            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+            .order_by('-total_usd')[:limit])
+    if not rows:
+        return "No sales rep data found for those filters."
+    return '\n'.join(
+        f"{i}. {r['distributor__salesperson_name']} ({r['distributor__region']}): "
+        f"${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units"
+        for i, r in enumerate(rows, 1)
+    )
+
+
+def _tool_get_revenue_trend(year=None, distributor_code=None, region=None, product_name=None):
+    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
+                        year=year, distributor_code=distributor_code,
+                        region=region, product_name=product_name)
+    rows = (qs.annotate(month=TruncMonth('invoice_date'))
+            .values('month')
+            .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+            .order_by('month'))
+    if not rows:
+        return "No trend data found for those filters."
+    lines = ["Month | Revenue (USD) | Units"]
+    for r in rows:
+        if r['month']:
+            lines.append(f"{r['month'].strftime('%Y-%m')}: ${r['total_usd'] or 0:,.0f} | {r['total_qty'] or 0:,} units")
+    return '\n'.join(lines)
+
+
+def _tool_get_summary(year=None, month=None, quarter=None, distributor_code=None, region=None):
+    qs = _apply_filters(_annotate_converted(POSRecord.objects.all(), 'USD'),
+                        year=year, month=month, quarter=quarter,
+                        distributor_code=distributor_code, region=region)
+    agg = qs.aggregate(
+        total_usd=Sum('converted_value'), total_qty=Sum('quantity'),
+        record_count=Count('id'),
+        customer_count=Count('customer_name', distinct=True),
+        distributor_count=Count('distributor', distinct=True),
+        product_count=Count('product_name', distinct=True),
+    )
+    dates = qs.aggregate(min_date=Min('invoice_date'), max_date=Max('invoice_date'))
+    return '\n'.join([
+        f"Total revenue (USD): ${agg['total_usd'] or 0:,.0f}",
+        f"Total units sold:    {agg['total_qty'] or 0:,}",
+        f"Invoice records:     {agg['record_count']:,}",
+        f"Unique customers:    {agg['customer_count']:,}",
+        f"Distributors:        {agg['distributor_count']:,}",
+        f"Unique products:     {agg['product_count']:,}",
+        f"Date range:          {dates['min_date']} to {dates['max_date']}",
+    ])
+
+
+def _execute_tool(name, inputs):
+    dispatch = {
+        'get_top_products':     _tool_get_top_products,
+        'get_top_distributors': _tool_get_top_distributors,
+        'get_top_customers':    _tool_get_top_customers,
+        'get_top_sales_reps':   _tool_get_top_sales_reps,
+        'get_revenue_trend':    _tool_get_revenue_trend,
+        'get_summary':          _tool_get_summary,
+    }
+    try:
+        fn = dispatch.get(name)
+        if not fn:
+            return f"Unknown tool: {name}"
+        return fn(**{k: v for k, v in inputs.items() if v is not None})
+    except Exception as exc:
+        return f"Tool error: {exc}"
+
+
 def ai_chat(request):
-    """AI assistant chat endpoint (POST only). Session-persisted conversation."""
+    """AI assistant — agentic tool-use loop against live DB."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -1541,21 +1683,17 @@ def ai_chat(request):
 
     system_prompt = f"""You are KPOS Assistant, an AI analyst built into Kramer Electronics' KPOS Point-of-Sale analytics platform.
 
-You have access to current, real data from the KPOS database:
+Use the provided tools to query live data. Always call a tool rather than guessing or relying on memory.
 
 {data_context}
 
-Notes:
-- Revenue figures are normalized to USD for cross-distributor comparison.
-- Today's date is {today_str}.
+Today: {today_str}. All revenue figures are normalized to USD.
 
 Guidelines:
-- Keep replies short and direct. Answer in 1–3 sentences unless the question genuinely requires more detail. No preamble, no restating the question, no filler.
-- Always use the conversation history to interpret follow-up questions in context. If the user asks "which are the top 3?" after asking about February, answer for February.
-- Format large numbers with commas and $ prefix (e.g., $1,234,567).
-- When comparing distributors or products, reference the specific numbers from the data above.
-- If asked to export or download the data as Excel or spreadsheet, end your reply with exactly the token: [EXPORT_EXCEL]
-- If you don't have enough data to answer something precisely, say so clearly.
+- Keep replies short and direct — 1–3 sentences unless detail is genuinely needed. No preamble or filler.
+- Use conversation context for follow-ups: if the user asks "which are the top 3?" after asking about February, query for February.
+- Format numbers with commas and $ prefix (e.g., $1,234,567).
+- If asked to export to Excel or spreadsheet, end your reply with exactly: [EXPORT_EXCEL]
 """
 
     history = request.session.get('ai_chat_history', [])
@@ -1564,25 +1702,63 @@ Guidelines:
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model='claude-opus-4-8',
-            max_tokens=1024,
-            system=system_prompt,
-            messages=history,
-        )
-        reply = response.content[0].text
+        reply = ''
+
+        for _ in range(6):  # max tool-use rounds
+            response = client.messages.create(
+                model='claude-opus-4-8',
+                max_tokens=1024,
+                system=system_prompt,
+                messages=history,
+                tools=KPOS_TOOLS,
+            )
+
+            if response.stop_reason == 'tool_use':
+                # Serialize assistant content (text + tool_use blocks) for session storage
+                asst_content = []
+                for blk in response.content:
+                    if blk.type == 'text':
+                        asst_content.append({'type': 'text', 'text': blk.text})
+                    elif blk.type == 'tool_use':
+                        asst_content.append({
+                            'type': 'tool_use',
+                            'id': blk.id,
+                            'name': blk.name,
+                            'input': blk.input,
+                        })
+                history.append({'role': 'assistant', 'content': asst_content})
+
+                # Execute each tool and collect results
+                tool_results = []
+                for blk in response.content:
+                    if blk.type == 'tool_use':
+                        result = _execute_tool(blk.name, blk.input)
+                        tool_results.append({
+                            'type': 'tool_result',
+                            'tool_use_id': blk.id,
+                            'content': result,
+                        })
+                history.append({'role': 'user', 'content': tool_results})
+
+            else:  # end_turn
+                reply = ''.join(blk.text for blk in response.content if blk.type == 'text')
+                break
+
+        if not reply:
+            reply = "I wasn't able to complete that request. Please try again."
+
     except Exception as exc:
         return JsonResponse({'error': f'AI error: {exc}'}, status=500)
 
-    history.append({'role': 'assistant', 'content': reply})
+    wants_export = '[EXPORT_EXCEL]' in reply
+    clean_reply = reply.replace('[EXPORT_EXCEL]', '').strip()
+
+    history.append({'role': 'assistant', 'content': clean_reply})
     if len(history) > 40:
         history = history[-40:]
 
     request.session['ai_chat_history'] = history
     request.session.modified = True
-
-    wants_export = '[EXPORT_EXCEL]' in reply
-    clean_reply = reply.replace('[EXPORT_EXCEL]', '').strip()
 
     return JsonResponse({'reply': clean_reply, 'wants_export': wants_export})
 
