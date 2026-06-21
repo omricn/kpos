@@ -497,7 +497,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: var(--kramer-purple);
+  background: rgba(130, 0, 180, 0.68);
   color: #fff;
   display: flex;
   align-items: center;
@@ -506,8 +506,8 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
   flex-shrink: 0;
   animation: ai-orb-spin-reverse 9s linear infinite;
-  /* solid card-bg hides gradient in gap; 8% purple tint on top */
-  box-shadow: 0 0 0 7px rgba(130, 0, 180, 0.08), 0 0 0 7px var(--bg-card);
+  /* solid card-bg hides gradient in gap; subtle purple tint on top */
+  box-shadow: 0 0 0 7px rgba(130, 0, 180, 0.10), 0 0 0 7px var(--bg-card);
 }
 
 .ai-panel {
