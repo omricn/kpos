@@ -376,18 +376,14 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
   requestAnimationFrame(positionOrbToCard);
   window.addEventListener('resize', positionOrbToCard);
 
-  // Keep orb behind Bootstrap offcanvas panels — watch for .show class on any offcanvas
+  // Hide orb instantly on offcanvas open; restore after it fully closes
   (function() {
     var orb3 = document.getElementById('aiOrb');
     if (!orb3) return;
-    function syncOrb() {
-      var anyOpen = !!document.querySelector('.offcanvas.show');
-      orb3.classList.toggle('behind-panel', anyOpen);
-    }
-    var mo = new MutationObserver(syncOrb);
-    document.querySelectorAll('.offcanvas').forEach(function(el) {
-      mo.observe(el, { attributes: true, attributeFilter: ['class'] });
+    document.querySelectorAll('[data-bs-toggle="offcanvas"]').forEach(function(btn) {
+      btn.addEventListener('click', function() { orb3.classList.add('behind-panel'); });
     });
+    document.addEventListener('hidden.bs.offcanvas', function() { orb3.classList.remove('behind-panel'); });
   })();
 })();
 </script>
