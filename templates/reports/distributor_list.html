@@ -332,8 +332,12 @@ document.getElementById('distJump').addEventListener('change', function() {
   const hoverHighlight = {
     id: 'hoverHighlight',
     afterEvent(chart, args) {
-      const active = chart.getActiveElements();
-      const idx = active.length ? active[0].datasetIndex : -1;
+      if (!args.event.native) return;
+      // Use 'nearest' mode to find which specific line is closest to the cursor
+      const nearest = chart.getElementsAtEventForMode(
+        args.event.native, 'nearest', { intersect: false }, false
+      );
+      const idx = nearest.length ? nearest[0].datasetIndex : -1;
       if (idx === _lastActive) return;
       _lastActive = idx;
       chart.data.datasets.forEach((ds, i) => {
@@ -341,6 +345,7 @@ document.getElementById('distJump').addEventListener('change', function() {
         if (idx === -1) {
           ds.borderColor = base;
           ds.borderWidth = 1.5;
+          ds.pointRadius = 0;
         } else if (i === idx) {
           ds.borderColor = base;
           ds.borderWidth = 2.5;
