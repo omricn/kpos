@@ -311,91 +311,114 @@ document.getElementById('distJump').addEventListener('change', function() {
   });
 })();
 
-{% if not selected_region and timeseries_data %}
+{% if timeseries_data %}
 (function() {
   const ts = {{ timeseries_data|safe }};
   const currSym = '{{ currency_symbol }}';
   const LINE_COLORS = ['#8205B4','#0EA5E9','#10B981','#F59E0B','#EF4444','#6366F1','#EC4899','#14B8A6','#F97316','#84CC16'];
+
   function fmtMoney(v) {
     if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
     if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
     return currSym + Math.round(v).toLocaleString();
   }
+
   const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
   const tickColor = isDark ? '#aaa' : '#666';
-  const gridColor = isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0';
 
-  const datasets = ts.datasets.map((d, i) => ({
-    label: d.name,
-    data: d.data,
-    borderColor: LINE_COLORS[i % LINE_COLORS.length],
-    backgroundColor: 'transparent',
-    tension: 0.35,
-    pointRadius: 2,
-    pointHoverRadius: 5,
-    borderWidth: 2,
-  }));
-
-  new Chart(document.getElementById('distOverviewChart').getContext('2d'), {
-    type: 'line',
-    data: { labels: ts.labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: tickColor } },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmtMoney(ctx.parsed.y) } }
-      },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: tickColor, maxRotation: 35 } },
-        y: { grid: { color: gridColor }, ticks: { callback: v => fmtMoney(v), color: tickColor } }
-      }
+  // Hover-highlight plugin: dim other lines when hovering one
+  let _lastActive = -1;
+  const hoverHighlight = {
+    id: 'hoverHighlight',
+    afterEvent(chart, args) {
+      const active = chart.getActiveElements();
+      const idx = active.length ? active[0].datasetIndex : -1;
+      if (idx === _lastActive) return;
+      _lastActive = idx;
+      chart.data.datasets.forEach((ds, i) => {
+        const base = LINE_COLORS[i % LINE_COLORS.length];
+        if (idx === -1) {
+          ds.borderColor = base;
+          ds.borderWidth = 1.5;
+        } else if (i === idx) {
+          ds.borderColor = base;
+          ds.borderWidth = 2.5;
+          ds.pointRadius = 3;
+        } else {
+          ds.borderColor = base + '28'; // ~16% opacity
+          ds.borderWidth = 1;
+          ds.pointRadius = 0;
+        }
+      });
+      chart.update('none');
     }
-  });
-})();
-{% endif %}
+  };
 
-{% if selected_region and timeseries_data %}
-(function() {
-  const ts = {{ timeseries_data|safe }};
-  const currSym = '{{ currency_symbol }}';
-  const LINE_COLORS = ['#8205B4','#0EA5E9','#10B981','#F59E0B','#EF4444','#6366F1','#EC4899','#14B8A6','#F97316','#84CC16'];
-  function fmtMoney(v) {
-    if (v >= 1e6) return currSym + (v/1e6).toFixed(2) + 'M';
-    if (v >= 1e3) return currSym + (v/1e3).toFixed(0) + 'K';
-    return currSym + Math.round(v).toLocaleString();
+  function makeChart(canvasId, maintainRatio) {
+    const datasets = ts.datasets.map((d, i) => ({
+      label: d.name,
+      data: d.data,
+      borderColor: LINE_COLORS[i % LINE_COLORS.length],
+      backgroundColor: 'transparent',
+      tension: 0.4,
+      pointRadius: 0,          // hidden by default — appear on hover
+      pointHoverRadius: 6,
+      borderWidth: 1.5,
+      spanGaps: true,           // no hollow circles for missing months
+    }));
+
+    new Chart(document.getElementById(canvasId).getContext('2d'), {
+      type: 'line',
+      data: { labels: ts.labels, datasets },
+      plugins: [hoverHighlight],
+      options: {
+        responsive: true,
+        maintainAspectRatio: maintainRatio,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, color: tickColor, padding: 16 },
+            onClick(e, legendItem, legend) {
+              // Built-in toggle, then reset dimming
+              Chart.defaults.plugins.legend.onClick.call(this, e, legendItem, legend);
+              _lastActive = -1;
+            }
+          },
+          tooltip: {
+            backgroundColor: isDark ? 'rgba(30,30,30,0.92)' : 'rgba(255,255,255,0.95)',
+            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+            borderWidth: 1,
+            titleColor: isDark ? '#e5e5e5' : '#111',
+            bodyColor: isDark ? '#ccc' : '#444',
+            padding: 10,
+            itemSort: (a, b) => b.parsed.y - a.parsed.y,
+            filter: item => item.parsed.y > 0,
+            callbacks: {
+              label: ctx => '  ' + ctx.dataset.label + ':  ' + fmtMoney(ctx.parsed.y)
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, color: tickColor, maxRotation: 0, maxTicksLimit: 12 }
+          },
+          y: {
+            grid: { color: gridColor, drawBorder: false },
+            ticks: { callback: v => fmtMoney(v), color: tickColor, font: { size: 11 } }
+          }
+        }
+      }
+    });
   }
-  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-  const tickColor = isDark ? '#aaa' : '#666';
-  const gridColor = isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
 
-  const datasets = ts.datasets.map((d, i) => ({
-    label: d.name,
-    data: d.data,
-    borderColor: LINE_COLORS[i % LINE_COLORS.length],
-    backgroundColor: 'transparent',
-    tension: 0.35,
-    pointRadius: 2,
-    pointHoverRadius: 5,
-    borderWidth: 2,
-  }));
-
-  new Chart(document.getElementById('distChart').getContext('2d'), {
-    type: 'line',
-    data: { labels: ts.labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: true,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: tickColor } },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmtMoney(ctx.parsed.y) } }
-      },
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: tickColor, maxRotation: 35 } },
-        y: { grid: { color: gridColor }, ticks: { callback: v => fmtMoney(v), color: tickColor } }
-      }
-    }
-  });
+  {% if not selected_region %}
+  makeChart('distOverviewChart', false);
+  {% else %}
+  makeChart('distChart', true);
+  {% endif %}
 })();
 {% endif %}
 </script>
