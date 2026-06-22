@@ -327,6 +327,8 @@ def dashboard(request):
     currency_symbol = _currency_symbol(selected_currency)
     rates = _get_rates()
 
+    _dash_cache_key = f'dash:{region}:{distributor_id}:{date_from}:{date_to}:{selected_currency}'
+
     # Base queryset without date filters (for comparison)
     qs_base = POSRecord.objects.select_related('distributor')
     if region:
@@ -341,167 +343,149 @@ def dashboard(request):
     if date_to:
         qs = qs.filter(invoice_date__lte=date_to)
 
-    qs_conv = _annotate_converted(qs, selected_currency, rates)
-    totals = qs_conv.aggregate(
-        total_revenue=Sum('converted_value'),
-        total_units=Sum('quantity'),
-        unique_countries=Count('country', distinct=True),
-    )
-    active_distributors = qs.values('distributor').distinct().count()
-
-    # Prior-period comparison (native currency, approximate)
-    prior = _prior_period_stats(qs_base, date_from, date_to)
-    current_rev   = float(totals['total_revenue'] or 0)
-    current_units = int(totals['total_units'] or 0)
-    rev_change_pct   = None
-    units_change_pct = None
-    if prior:
-        if prior['revenue'] > 0:
-            rev_change_pct = round((current_rev - prior['revenue']) / prior['revenue'] * 100, 1)
-        if prior['units'] > 0:
-            units_change_pct = round((current_units - prior['units']) / prior['units'] * 100, 1)
     today = date_cls.today()
-    if date_from or date_to:
-        prior_label = 'vs prev period'
+
+    # --- Cache all expensive aggregation queries for 90 seconds per filter combination ---
+    _dash_cached = cache.get(_dash_cache_key)
+    if _dash_cached:
+        (current_rev, current_units, active_distributors,
+         unique_countries, rev_change_pct, units_change_pct, prior_label,
+         chart_data, region_donut, region_cards, top_products, top_salespersons,
+         dist_summary) = _dash_cached
     else:
-        first_of_month = today.replace(day=1)
-        prior_month_last = first_of_month - timedelta(days=1)
-        prior_label = 'vs ' + prior_month_last.strftime('%b %Y')
-
-    # Monthly revenue by region for wave chart
-    monthly_qs = list(
-        _annotate_converted(
-            qs.filter(invoice_date__isnull=False, invoiced_value__isnull=False),
-            selected_currency, rates
+        qs_conv = _annotate_converted(qs, selected_currency, rates)
+        totals = qs_conv.aggregate(
+            total_revenue=Sum('converted_value'),
+            total_units=Sum('quantity'),
+            unique_countries=Count('country', distinct=True),
         )
-        .annotate(month=TruncMonth('invoice_date'))
-        .values('month', 'distributor__region')
-        .annotate(revenue=Sum('converted_value'))
-        .order_by('month', 'distributor__region')
-    )
-    months_sorted = sorted(set(r['month'] for r in monthly_qs))
-    month_labels  = [m.strftime('%b %Y') for m in months_sorted]
-    month_keys    = [m.strftime('%Y-%m') for m in months_sorted]
+        active_distributors = qs.values('distributor').distinct().count()
+        unique_countries = totals['unique_countries'] or 0
 
-    region_order = {}
-    for r in monthly_qs:
-        reg = r['distributor__region'] or 'Unknown'
-        if reg not in region_order:
-            region_order[reg] = {'by_month': {}}
-        region_order[reg]['by_month'][r['month'].strftime('%Y-%m')] = float(r['revenue'])
+        prior = _prior_period_stats(qs_base, date_from, date_to)
+        current_rev   = float(totals['total_revenue'] or 0)
+        current_units = int(totals['total_units'] or 0)
+        rev_change_pct   = None
+        units_change_pct = None
+        if prior:
+            if prior['revenue'] > 0:
+                rev_change_pct = round((current_rev - prior['revenue']) / prior['revenue'] * 100, 1)
+            if prior['units'] > 0:
+                units_change_pct = round((current_units - prior['units']) / prior['units'] * 100, 1)
+        if date_from or date_to:
+            prior_label = 'vs prev period'
+        else:
+            first_of_month = today.replace(day=1)
+            prior_label = 'vs ' + (first_of_month - timedelta(days=1)).strftime('%b %Y')
 
-    datasets = []
-    for reg, info in region_order.items():
-        color = REGION_COLORS.get(reg, '#6c757d')
-        datasets.append({
-            'label': reg,
-            'data': [info['by_month'].get(mk, 0) for mk in month_keys],
-            'backgroundColor': color,
-            'borderColor': color,
-            'borderWidth': 0,
-            'fill': False,
-            'tension': 0,
-            'pointRadius': 0,
-            'pointHoverRadius': 0,
-            'borderRadius': 4,
-            '_color': color,
-            'region': reg,
+        monthly_qs = list(
+            _annotate_converted(
+                qs.filter(invoice_date__isnull=False, invoiced_value__isnull=False),
+                selected_currency, rates
+            )
+            .annotate(month=TruncMonth('invoice_date'))
+            .values('month', 'distributor__region')
+            .annotate(revenue=Sum('converted_value'))
+            .order_by('month', 'distributor__region')
+        )
+        months_sorted = sorted(set(r['month'] for r in monthly_qs))
+        month_labels  = [m.strftime('%b %Y') for m in months_sorted]
+        month_keys    = [m.strftime('%Y-%m') for m in months_sorted]
+        region_order  = {}
+        for r in monthly_qs:
+            reg = r['distributor__region'] or 'Unknown'
+            if reg not in region_order:
+                region_order[reg] = {'by_month': {}}
+            region_order[reg]['by_month'][r['month'].strftime('%Y-%m')] = float(r['revenue'])
+        datasets = []
+        for reg, info in region_order.items():
+            color = REGION_COLORS.get(reg, '#6c757d')
+            datasets.append({
+                'label': reg,
+                'data': [info['by_month'].get(mk, 0) for mk in month_keys],
+                'backgroundColor': color, 'borderColor': color,
+                'borderWidth': 0, 'fill': False, 'tension': 0,
+                'pointRadius': 0, 'pointHoverRadius': 0, 'borderRadius': 4,
+                '_color': color, 'region': reg,
+            })
+        chart_data = json.dumps({'labels': month_labels, 'datasets': datasets})
+
+        region_donut_raw = list(
+            _annotate_converted(qs.filter(invoiced_value__isnull=False), selected_currency, rates)
+            .values('distributor__region')
+            .annotate(revenue=Sum('converted_value'), records=Count('id'),
+                      dist_count=Count('distributor', distinct=True),
+                      country_count=Count('country', distinct=True))
+            .order_by('-revenue')
+        )
+        total_donut = sum(float(r['revenue'] or 0) for r in region_donut_raw) or 1
+        region_cards = [
+            {'name': r['distributor__region'] or 'Unknown', 'revenue': float(r['revenue'] or 0),
+             'records': r['records'] or 0, 'dist_count': r['dist_count'] or 0,
+             'country_count': r['country_count'] or 0,
+             'color': REGION_COLORS.get(r['distributor__region'], '#6c757d'),
+             'pct': round(float(r['revenue'] or 0) / total_donut * 100, 1)}
+            for r in region_donut_raw
+        ]
+        region_donut = json.dumps({
+            'labels': [r['name'] for r in region_cards],
+            'data':   [round(r['revenue'], 2) for r in region_cards],
+            'colors': [r['color'] for r in region_cards],
+            'pcts':   [r['pct'] for r in region_cards],
         })
-    chart_data = json.dumps({'labels': month_labels, 'datasets': datasets})
 
-    # Region cards + donut chart data
-    region_donut_raw = list(
-        _annotate_converted(
-            qs.filter(invoiced_value__isnull=False),
-            selected_currency, rates
+        top_products = list(
+            _annotate_converted(qs.exclude(manufacturer_part_no=''), selected_currency, rates)
+            .values('manufacturer_part_no')
+            .annotate(description=Max('product_description'), revenue=Sum('converted_value'), units=Sum('quantity'))
+            .order_by('-revenue')[:10]
         )
-        .values('distributor__region')
-        .annotate(
-            revenue=Sum('converted_value'),
-            records=Count('id'),
-            dist_count=Count('distributor', distinct=True),
-            country_count=Count('country', distinct=True),
-        )
-        .order_by('-revenue')
-    )
-    total_donut = sum(float(r['revenue'] or 0) for r in region_donut_raw) or 1
-    region_cards = [
-        {
-            'name':       r['distributor__region'] or 'Unknown',
-            'revenue':    float(r['revenue'] or 0),
-            'records':    r['records'] or 0,
-            'dist_count': r['dist_count'] or 0,
-            'country_count': r['country_count'] or 0,
-            'color':      REGION_COLORS.get(r['distributor__region'], '#6c757d'),
-            'pct':        round(float(r['revenue'] or 0) / total_donut * 100, 1),
-        }
-        for r in region_donut_raw
-    ]
-    region_donut = json.dumps({
-        'labels': [r['name'] for r in region_cards],
-        'data':   [round(r['revenue'], 2) for r in region_cards],
-        'colors': [r['color'] for r in region_cards],
-        'pcts':   [r['pct'] for r in region_cards],
-    })
+        if top_products:
+            max_rev = float(max(p['revenue'] for p in top_products) or 1)
+            for p in top_products:
+                p['revenue'] = float(p['revenue'] or 0)
+                p['pct'] = round(p['revenue'] / max_rev * 100)
 
-    # Top 10 products by Kramer part number
-    top_products = list(
-        _annotate_converted(
-            qs.exclude(manufacturer_part_no=''),
-            selected_currency, rates
+        top_salespersons = list(
+            _annotate_converted(
+                qs.exclude(distributor__salesperson_name='').filter(invoiced_value__isnull=False),
+                selected_currency, rates
+            )
+            .values('distributor__salesperson_name', 'distributor__salesperson_code')
+            .annotate(revenue=Sum('converted_value'), units=Sum('quantity'),
+                      dist_count=Count('distributor', distinct=True))
+            .order_by('-revenue')[:5]
         )
-        .values('manufacturer_part_no')
-        .annotate(
-            description=Max('product_description'),
-            revenue=Sum('converted_value'),
-            units=Sum('quantity'),
-        )
-        .order_by('-revenue')[:10]
-    )
-    if top_products:
-        max_rev = float(max(p['revenue'] for p in top_products) or 1)
-        for p in top_products:
-            p['revenue'] = float(p['revenue'] or 0)
-            p['pct'] = round(p['revenue'] / max_rev * 100)
+        if top_salespersons:
+            max_sp_rev = float(max(sp['revenue'] for sp in top_salespersons) or 1)
+            for sp in top_salespersons:
+                sp['revenue'] = float(sp['revenue'] or 0)
+                sp['units'] = int(sp['units'] or 0)
+                sp['pct'] = round(sp['revenue'] / max_sp_rev * 100)
+        else:
+            for sp in top_salespersons:
+                sp['revenue'] = float(sp['revenue'] or 0)
+                sp['units'] = int(sp['units'] or 0)
+                sp['pct'] = 0
 
-    # Top 5 account managers
-    top_salespersons = list(
-        _annotate_converted(
-            qs.exclude(distributor__salesperson_name='').filter(invoiced_value__isnull=False),
-            selected_currency, rates
+        dist_summary = list(
+            _annotate_converted(qs, selected_currency, rates)
+            .values('distributor__id', 'distributor__name', 'distributor__region', 'distributor__code')
+            .annotate(revenue=Sum('converted_value'), units=Sum('quantity'),
+                      countries=Count('country', distinct=True), records=Count('id'))
+            .order_by('-revenue')
         )
-        .values('distributor__salesperson_name', 'distributor__salesperson_code')
-        .annotate(revenue=Sum('converted_value'), units=Sum('quantity'), dist_count=Count('distributor', distinct=True))
-        .order_by('-revenue')[:5]
-    )
-    if top_salespersons:
-        max_sp_rev = float(max(sp['revenue'] for sp in top_salespersons) or 1)
-        for sp in top_salespersons:
-            sp['revenue'] = float(sp['revenue'] or 0)
-            sp['units'] = int(sp['units'] or 0)
-            sp['pct'] = round(sp['revenue'] / max_sp_rev * 100)
-    else:
-        for sp in top_salespersons:
-            sp['revenue'] = float(sp['revenue'] or 0)
-            sp['units'] = int(sp['units'] or 0)
-            sp['pct'] = 0
+        total_dist_rev = sum(float(d['revenue'] or 0) for d in dist_summary) or 1
+        for d in dist_summary:
+            d['revenue_f'] = float(d['revenue'] or 0)
+            d['share_pct'] = round(d['revenue_f'] / total_dist_rev * 100, 1)
 
-    # Per-distributor summary table
-    dist_summary = list(
-        _annotate_converted(qs, selected_currency, rates)
-        .values('distributor__id', 'distributor__name', 'distributor__region', 'distributor__code')
-        .annotate(
-            revenue=Sum('converted_value'),
-            units=Sum('quantity'),
-            countries=Count('country', distinct=True),
-            records=Count('id'),
-        )
-        .order_by('-revenue')
-    )
-    total_dist_rev = sum(float(d['revenue'] or 0) for d in dist_summary) or 1
-    for d in dist_summary:
-        d['revenue_f']  = float(d['revenue'] or 0)
-        d['share_pct']  = round(d['revenue_f'] / total_dist_rev * 100, 1)
+        cache.set(_dash_cache_key, (
+            current_rev, current_units, active_distributors,
+            unique_countries, rev_change_pct, units_change_pct, prior_label,
+            chart_data, region_donut, region_cards, top_products, top_salespersons,
+            dist_summary,
+        ), 90)
 
     all_regions      = Distributor.objects.exclude(region='').values_list('region', flat=True).distinct().order_by('region')
     all_distributors = (Distributor.objects.filter(region=region) if region else Distributor.objects.all()).order_by('name')
@@ -520,7 +504,7 @@ def dashboard(request):
         'total_revenue':      current_rev,
         'total_units':        current_units,
         'active_distributors': active_distributors,
-        'unique_countries':   totals['unique_countries'] or 0,
+        'unique_countries':   unique_countries,
         'rev_change_pct':     rev_change_pct,
         'units_change_pct':   units_change_pct,
         'prior_label':        prior_label,

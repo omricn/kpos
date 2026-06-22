@@ -61,6 +61,7 @@ if os.environ.get('DB_HOST'):
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
             'HOST': os.environ.get('DB_HOST'),
             'PORT': os.environ.get('DB_PORT', '5432'),
+            'CONN_MAX_AGE': 600,  # keep connection alive 10 min — avoids per-request reconnect overhead
         }
     }
 else:
@@ -70,6 +71,17 @@ else:
             'NAME': BASE_DIR / 'pos.db',
         }
     }
+
+# In-memory cache (per-process); used by cached_db session backend and view caches
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'kpos-cache',
+    }
+}
+
+# Read sessions from memory cache first, fall back to DB — halves session DB reads on navigation
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
