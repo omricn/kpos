@@ -1835,6 +1835,16 @@ Today: {today_str}. All revenue is in USD.
     wants_export = '[EXPORT_EXCEL]' in reply
     clean_reply = reply.replace('[EXPORT_EXCEL]', '').strip()
 
+    if wants_export:
+        # Find the most recent tool_use block so ai_export can reproduce the exact query
+        for msg in reversed(history):
+            if msg.get('role') == 'assistant' and isinstance(msg.get('content'), list):
+                for blk in reversed(msg['content']):
+                    if blk.get('type') == 'tool_use':
+                        request.session['ai_last_export'] = {'tool': blk['name'], 'input': blk['input']}
+                        break
+                break
+
     history.append({'role': 'assistant', 'content': clean_reply})
     if len(history) > 40:
         history = history[-40:]
@@ -1870,93 +1880,190 @@ def ai_history(request):
 
 
 def ai_export(request):
-    """Generate a comprehensive Excel export for the AI assistant download button."""
+    """Export exactly what the AI last queried, or a generic summary if no context exists."""
     from io import BytesIO
     from openpyxl.styles import Font, PatternFill, Alignment
     from openpyxl.utils import get_column_letter
 
     wb = openpyxl.Workbook()
-
     hdr_fill = PatternFill(start_color='8200B4', end_color='8200B4', fill_type='solid')
     hdr_font = Font(color='FFFFFF', bold=True)
-    hdr_align = Alignment(horizontal='center')
 
     def make_header(ws, headers):
         ws.append(headers)
         for cell in ws[1]:
             cell.fill = hdr_fill
             cell.font = hdr_font
-            cell.alignment = hdr_align
+            cell.alignment = Alignment(horizontal='center')
 
     def autofit(ws):
         for col in ws.columns:
             width = max((len(str(c.value or '')) for c in col), default=10)
             ws.column_dimensions[get_column_letter(col[0].column)].width = min(width + 4, 50)
 
-    qs = _annotate_converted(POSRecord.objects.all(), 'USD')
+    last_export = request.session.get('ai_last_export')
+
+    if last_export:
+        tool = last_export['tool']
+        inp  = last_export['input']
+        limit = min(int(inp.get('limit') or 50), 500)
+
+        if tool == 'get_top_products':
+            qs = _apply_filters(
+                POSRecord.objects.exclude(manufacturer_part_no='').filter(invoiced_value__isnull=False),
+                year=inp.get('year'), month=inp.get('month'), quarter=inp.get('quarter'),
+                distributor_code=inp.get('distributor_code'), region=inp.get('region'),
+                country=inp.get('country'), product_name=inp.get('product_name'))
+            order = '-total_usd' if inp.get('sort_by') != 'units' else '-total_qty'
+            rows = (qs.values('manufacturer_part_no', 'product_description')
+                      .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+                      .order_by(order)[:limit])
+            ws = wb.active
+            ws.title = 'Top Products'
+            make_header(ws, ['Part No', 'Description', 'Revenue (USD)', 'Units'])
+            for r in rows:
+                ws.append([r['manufacturer_part_no'], r['product_description'] or '',
+                            round(float(r['total_usd'] or 0), 2), int(r['total_qty'] or 0)])
+
+        elif tool == 'get_top_distributors':
+            qs = _apply_filters(
+                POSRecord.objects.filter(invoiced_value__isnull=False),
+                year=inp.get('year'), month=inp.get('month'), quarter=inp.get('quarter'),
+                region=inp.get('region'))
+            order = '-total_usd' if inp.get('sort_by') != 'units' else '-total_qty'
+            rows = (qs.values('distributor__name', 'distributor__region')
+                      .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+                      .order_by(order)[:limit])
+            ws = wb.active
+            ws.title = 'Top Distributors'
+            make_header(ws, ['Distributor', 'Region', 'Revenue (USD)', 'Units'])
+            for r in rows:
+                ws.append([r['distributor__name'], r['distributor__region'] or '',
+                            round(float(r['total_usd'] or 0), 2), int(r['total_qty'] or 0)])
+
+        elif tool == 'get_top_customers':
+            qs = _apply_filters(
+                POSRecord.objects.exclude(customer_name='').filter(invoiced_value__isnull=False),
+                year=inp.get('year'), month=inp.get('month'), quarter=inp.get('quarter'),
+                distributor_code=inp.get('distributor_code'), region=inp.get('region'),
+                country=inp.get('country'))
+            order = '-total_usd' if inp.get('sort_by') != 'units' else '-total_qty'
+            rows = (qs.values('customer_name', 'country', 'distributor__name', 'distributor__region')
+                      .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+                      .order_by(order)[:limit])
+            ws = wb.active
+            ws.title = 'Top Customers'
+            make_header(ws, ['Customer', 'Country', 'Distributor', 'Revenue (USD)', 'Units'])
+            for r in rows:
+                ws.append([r['customer_name'], r['country'] or '',
+                            r['distributor__name'] or '',
+                            round(float(r['total_usd'] or 0), 2), int(r['total_qty'] or 0)])
+
+        elif tool == 'get_top_sales_reps':
+            qs = _apply_filters(
+                POSRecord.objects.filter(distributor__salesperson_name__gt='', invoiced_value__isnull=False),
+                year=inp.get('year'), month=inp.get('month'), quarter=inp.get('quarter'),
+                distributor_code=inp.get('distributor_code'), region=inp.get('region'))
+            rows = (qs.values('distributor__salesperson_name', 'distributor__region')
+                      .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+                      .order_by('-total_usd')[:limit])
+            ws = wb.active
+            ws.title = 'Top Sales Reps'
+            make_header(ws, ['Sales Rep', 'Region', 'Revenue (USD)', 'Units'])
+            for r in rows:
+                ws.append([r['distributor__salesperson_name'], r['distributor__region'] or '',
+                            round(float(r['total_usd'] or 0), 2), int(r['total_qty'] or 0)])
+
+        elif tool == 'get_revenue_trend':
+            qs = _apply_filters(
+                POSRecord.objects.filter(invoiced_value__isnull=False),
+                year=inp.get('year'), distributor_code=inp.get('distributor_code'),
+                region=inp.get('region'), product_name=inp.get('product_name'))
+            rows = (qs.annotate(month=TruncMonth('invoice_date'))
+                      .values('month')
+                      .annotate(total_usd=_usd_sum_expr(), total_qty=Sum('quantity'))
+                      .order_by('month'))
+            ws = wb.active
+            ws.title = 'Revenue Trend'
+            make_header(ws, ['Month', 'Revenue (USD)', 'Units'])
+            for r in rows:
+                if r['month']:
+                    ws.append([r['month'].strftime('%Y-%m'),
+                                round(float(r['total_usd'] or 0), 2), int(r['total_qty'] or 0)])
+
+        elif tool == 'get_summary':
+            qs = _apply_filters(
+                POSRecord.objects.filter(invoiced_value__isnull=False),
+                year=inp.get('year'), month=inp.get('month'), quarter=inp.get('quarter'),
+                distributor_code=inp.get('distributor_code'), region=inp.get('region'))
+            agg = qs.aggregate(
+                total_usd=_usd_sum_expr(), total_qty=Sum('quantity'),
+                record_count=Count('id'),
+                customer_count=Count('customer_name', distinct=True),
+                distributor_count=Count('distributor', distinct=True),
+                product_count=Count('manufacturer_part_no', distinct=True),
+            )
+            ws = wb.active
+            ws.title = 'Summary'
+            make_header(ws, ['Metric', 'Value'])
+            ws.append(['Total Revenue (USD)', round(float(agg['total_usd'] or 0), 2)])
+            ws.append(['Total Units', int(agg['total_qty'] or 0)])
+            ws.append(['Invoice Records', agg['record_count']])
+            ws.append(['Unique Customers', agg['customer_count']])
+            ws.append(['Distributors', agg['distributor_count']])
+            ws.append(['Unique Products', agg['product_count']])
+
+        else:
+            last_export = None  # fall through to generic
+
+        if last_export:
+            autofit(wb.active)
+            fname = f'KPOS_{tool.replace("get_", "").replace("_", "-")}_{date_cls.today():%Y%m%d}.xlsx'
+            buf = BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            resp = HttpResponse(buf.read(),
+                                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            resp['Content-Disposition'] = f'attachment; filename="{fname}"'
+            return resp
+
+    # ── Generic fallback export (no AI context) ────────────────────────────────
+    qs_all = _annotate_converted(POSRecord.objects.all(), 'USD')
 
     ws1 = wb.active
     ws1.title = 'Distributor Summary'
     make_header(ws1, ['Distributor', 'Region', 'Revenue (USD)', 'Units', 'Records'])
-    for d in (
-        qs.values('distributor__name', 'distributor__region')
-        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'), record_count=Count('id'))
-        .order_by('-total_usd')
-    ):
-        ws1.append([
-            d['distributor__name'], d['distributor__region'],
-            float(d['total_usd'] or 0), int(d['total_qty'] or 0), d['record_count'],
-        ])
+    for d in (qs_all.values('distributor__name', 'distributor__region')
+              .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'), record_count=Count('id'))
+              .order_by('-total_usd')):
+        ws1.append([d['distributor__name'], d['distributor__region'],
+                    float(d['total_usd'] or 0), int(d['total_qty'] or 0), d['record_count']])
     autofit(ws1)
 
-    ws2 = wb.create_sheet('Product Summary')
-    make_header(ws2, ['Part No', 'Description', 'Revenue (USD)', 'Units', 'Distributors'])
-    for p in (
-        qs.exclude(manufacturer_part_no='')
-        .values('manufacturer_part_no', 'product_description')
-        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'), dist_count=Count('distributor', distinct=True))
-        .order_by('-total_usd')[:100]
-    ):
-        ws2.append([
-            p['manufacturer_part_no'], p['product_description'] or '',
-            float(p['total_usd'] or 0), int(p['total_qty'] or 0), p['dist_count'],
-        ])
+    ws2 = wb.create_sheet('Top Products')
+    make_header(ws2, ['Part No', 'Description', 'Revenue (USD)', 'Units'])
+    for p in (qs_all.exclude(manufacturer_part_no='')
+              .values('manufacturer_part_no', 'product_description')
+              .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+              .order_by('-total_usd')[:100]):
+        ws2.append([p['manufacturer_part_no'], p['product_description'] or '',
+                    float(p['total_usd'] or 0), int(p['total_qty'] or 0)])
     autofit(ws2)
 
     ws3 = wb.create_sheet('Monthly Trend')
     make_header(ws3, ['Month', 'Revenue (USD)', 'Units'])
-    for m in (
-        qs.annotate(month=TruncMonth('invoice_date'))
-        .values('month')
-        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-        .order_by('month')
-    ):
+    for m in (qs_all.annotate(month=TruncMonth('invoice_date'))
+              .values('month')
+              .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
+              .order_by('month')):
         if m['month']:
             ws3.append([m['month'].strftime('%Y-%m'), float(m['total_usd'] or 0), int(m['total_qty'] or 0)])
     autofit(ws3)
 
-    ws4 = wb.create_sheet('Customer Summary')
-    make_header(ws4, ['Customer', 'Country', 'Region', 'Revenue (USD)', 'Units'])
-    for c in (
-        qs.exclude(customer_name='')
-        .values('customer_name', 'country', 'distributor__region')
-        .annotate(total_usd=Sum('converted_value'), total_qty=Sum('quantity'))
-        .order_by('-total_usd')[:200]
-    ):
-        ws4.append([
-            c['customer_name'], c['country'] or '', c['distributor__region'] or '',
-            float(c['total_usd'] or 0), int(c['total_qty'] or 0),
-        ])
-    autofit(ws4)
-
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-
-    today_str = date_cls.today().strftime('%Y%m%d')
-    response = HttpResponse(
-        buf.read(),
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    )
-    response['Content-Disposition'] = f'attachment; filename="KPOS_Export_{today_str}.xlsx"'
-    return response
+    resp = HttpResponse(buf.read(),
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = f'attachment; filename="KPOS_Export_{date_cls.today():%Y%m%d}.xlsx"'
+    return resp
