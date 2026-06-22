@@ -799,6 +799,28 @@ def distributor_list(request):
         'pks': [d['pk'] for d in chart_items],
     })
 
+    # Time-series: monthly revenue per top-10 distributor
+    from collections import defaultdict
+    top10_ids = [d['pk'] for d in dist_data[:10]]
+    monthly_qs = list(
+        _annotate_converted(qs.filter(distributor__id__in=top10_ids), selected_currency, rates)
+        .annotate(month=TruncMonth('invoice_date'))
+        .values('distributor__id', 'distributor__name', 'month')
+        .annotate(month_revenue=Sum('converted_value'))
+        .order_by('month')
+    )
+    sorted_months = sorted(set(r['month'] for r in monthly_qs if r['month']))
+    month_labels = [m.strftime('%b %Y') for m in sorted_months]
+    dist_monthly = defaultdict(dict)
+    for r in monthly_qs:
+        if r['month']:
+            dist_monthly[r['distributor__id']][r['month']] = float(r['month_revenue'] or 0)
+    ts_datasets = [
+        {'name': d['name'], 'pk': d['pk'], 'data': [dist_monthly[d['pk']].get(m, 0) for m in sorted_months]}
+        for d in dist_data[:10]
+    ]
+    timeseries_data = json.dumps({'labels': month_labels, 'datasets': ts_datasets})
+
     filtered_distributors = None
     if selected_region:
         filtered_distributors = dist_data
@@ -821,6 +843,7 @@ def distributor_list(request):
         'dist_data': dist_data,
         'top3': top3,
         'chart_data': chart_data,
+        'timeseries_data': timeseries_data,
         'has_filters': bool(date_from or date_to or selected_sp),
         'filters': {'date_from': date_from, 'date_to': date_to, 'region': selected_region, 'salesperson': selected_sp},
         'jump_distributors': jump_distributors,
