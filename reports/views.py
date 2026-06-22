@@ -1853,6 +1853,22 @@ def ai_clear(request):
     return JsonResponse({'ok': True})
 
 
+def ai_history(request):
+    """Return visible (text-only) chat history for DOM restore on page load."""
+    history = request.session.get('ai_chat_history', [])
+    visible = []
+    for msg in history:
+        role = msg.get('role')
+        content = msg.get('content')
+        # Only include actual text messages — skip tool_use/tool_result blocks
+        if isinstance(content, str) and content.strip():
+            if role == 'user':
+                visible.append({'role': 'user', 'text': content})
+            elif role == 'assistant':
+                visible.append({'role': 'bot', 'text': content})
+    return JsonResponse({'history': visible})
+
+
 def ai_export(request):
     """Generate a comprehensive Excel export for the AI assistant download button."""
     from io import BytesIO

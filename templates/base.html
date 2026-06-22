@@ -238,11 +238,16 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
       positionOrbToCard();
       panel.classList.add('open');
       orb.style.display = 'none';
+      var messages = document.getElementById('aiMessages');
       if (document.getElementById('aiWelcome')) {
+        // No history — show greeting
         var h  = new Date().getHours();
         var gr = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
         var nm = (typeof KPOS_AI_USER !== 'undefined' && KPOS_AI_USER) ? ', ' + KPOS_AI_USER : '';
         appendBubble(gr + nm + '. How can I help you today?', 'bot');
+      } else {
+        // History restored — scroll to bottom
+        if (messages) messages.scrollTop = messages.scrollHeight;
       }
       setTimeout(function () {
         var inp = document.getElementById('aiInput');
@@ -353,6 +358,20 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
       appendBubble('Conversation cleared. How can I help you?', 'bot');
     });
   };
+
+  // Restore chat history from server session on every page load
+  (function loadHistory() {
+    fetch('{% url "ai_history" %}')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.history && data.history.length) {
+          data.history.forEach(function (msg) {
+            appendBubble(msg.text, msg.role);
+          });
+        }
+      })
+      .catch(function () {});
+  })();
 
   requestAnimationFrame(positionOrbToCard);
   window.addEventListener('resize', positionOrbToCard);
