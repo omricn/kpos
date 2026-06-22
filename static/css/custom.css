@@ -463,6 +463,8 @@ h1, h2, h3, h4, h5, h6 {
   80%      { border-radius: 55% 45% 42% 58% / 44% 56% 44% 56%; }
 }
 
+.ai-orb.behind-panel { z-index: 1030 !important; }
+
 .ai-orb {
   position: fixed;
   top: 160px;

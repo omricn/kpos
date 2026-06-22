@@ -375,6 +375,20 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
 
   requestAnimationFrame(positionOrbToCard);
   window.addEventListener('resize', positionOrbToCard);
+
+  // Keep orb behind Bootstrap offcanvas panels — watch for .show class on any offcanvas
+  (function() {
+    var orb3 = document.getElementById('aiOrb');
+    if (!orb3) return;
+    function syncOrb() {
+      var anyOpen = !!document.querySelector('.offcanvas.show');
+      orb3.classList.toggle('behind-panel', anyOpen);
+    }
+    var mo = new MutationObserver(syncOrb);
+    document.querySelectorAll('.offcanvas').forEach(function(el) {
+      mo.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+  })();
 })();
 </script>
 {% block extra_js %}{% endblock %}
