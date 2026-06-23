@@ -143,6 +143,7 @@
             <th>Currency</th>
             <th>Order Ref</th>
             <th>Invoice Ref</th>
+            <th>Rep</th>
           </tr>
         </thead>
         <tbody>
@@ -170,10 +171,36 @@
             <td>{{ r.currency|default:"" }}</td>
             <td class="text-muted small">{{ r.order_ref|default:"—" }}</td>
             <td class="text-muted small">{{ r.invoice_ref|default:"—" }}</td>
+            <td class="text-nowrap rep-cell" style="min-width:130px" onclick="event.stopPropagation()">
+              <span class="rep-label {% if r.salesperson_override_id %}rep-override{% endif %}"
+                    data-record="{{ r.pk }}"
+                    data-override-id="{{ r.salesperson_override_id|default:'' }}">
+                {{ r.eff_rep_name|default:"—" }}
+              </span>
+              <button class="btn btn-link btn-sm p-0 ms-1 rep-edit-btn text-muted"
+                      data-record="{{ r.pk }}"
+                      data-current="{{ r.salesperson_override_id|default:'' }}"
+                      title="Override rep for this invoice"
+                      style="vertical-align:baseline">
+                <i class="bi bi-pencil-square" style="font-size:.7rem"></i>
+              </button>
+              <div class="rep-editor d-none" id="rep-editor-{{ r.pk }}">
+                <select class="form-select form-select-sm mt-1 rep-select" style="font-size:.8rem">
+                  <option value="">— clear override —</option>
+                  {% for sp in all_salespersons %}
+                  <option value="{{ sp.pk }}" {% if r.salesperson_override_id == sp.pk %}selected{% endif %}>{{ sp.agent_name }}</option>
+                  {% endfor %}
+                </select>
+                <div class="d-flex gap-1 mt-1">
+                  <button class="btn btn-kramer btn-sm rep-save-btn" data-record="{{ r.pk }}" style="font-size:.75rem;padding:2px 8px">Save</button>
+                  <button class="btn btn-outline-secondary btn-sm rep-cancel-btn" style="font-size:.75rem;padding:2px 8px">✕</button>
+                </div>
+              </div>
+            </td>
           </tr>
           <!-- Expandable detail row -->
           <tr class="collapse detail-row" id="detail-{{ r.pk }}">
-            <td colspan="12" style="background:var(--bg-elevated)">
+            <td colspan="13" style="background:var(--bg-elevated)">
               <div class="row g-3 p-2 small">
                 <div class="col-md-4">
                   <strong>Customer</strong><br>
@@ -213,4 +240,84 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.rep-override { color: var(--kramer-purple); font-weight: 600; }
+.rep-edit-btn { opacity: 0; transition: opacity .15s; }
+.rep-cell:hover .rep-edit-btn { opacity: 1; }
+.rep-editor .form-select { min-width: 160px; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const SET_REP_URL = '{% url "set_record_rep" %}';
+
+document.querySelectorAll('.rep-edit-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const rid = btn.dataset.record;
+    document.querySelectorAll('.rep-editor').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.rep-edit-btn').forEach(b => b.classList.remove('d-none'));
+    const editor = document.getElementById('rep-editor-' + rid);
+    editor.classList.remove('d-none');
+    btn.classList.add('d-none');
+  });
+});
+
+document.querySelectorAll('.rep-cancel-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const editor = btn.closest('.rep-editor');
+    const rid = editor.id.replace('rep-editor-', '');
+    editor.classList.add('d-none');
+    document.querySelector('.rep-edit-btn[data-record="' + rid + '"]').classList.remove('d-none');
+  });
+});
+
+document.querySelectorAll('.rep-save-btn').forEach(btn => {
+  btn.addEventListener('click', async e => {
+    e.stopPropagation();
+    const rid = btn.dataset.record;
+    const editor = document.getElementById('rep-editor-' + rid);
+    const sel = editor.querySelector('.rep-select');
+    const spId = sel.value;
+    const repName = spId ? sel.options[sel.selectedIndex].text : null;
+
+    btn.disabled = true;
+    btn.textContent = '…';
+
+    try {
+      const fd = new FormData();
+      fd.append('csrfmiddlewaretoken', CSRF);
+      fd.append('record_id', rid);
+      fd.append('salesperson_id', spId);
+      const res = await fetch(SET_REP_URL, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.ok) {
+        const label = document.querySelector('.rep-label[data-record="' + rid + '"]');
+        if (repName) {
+          label.textContent = repName;
+          label.classList.add('rep-override');
+          label.dataset.overrideId = spId;
+        } else {
+          label.textContent = '—';
+          label.classList.remove('rep-override');
+          label.dataset.overrideId = '';
+        }
+        editor.classList.add('d-none');
+        document.querySelector('.rep-edit-btn[data-record="' + rid + '"]').classList.remove('d-none');
+      }
+    } catch (err) {
+      alert('Failed to save. Please try again.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save';
+    }
+  });
+});
+</script>
 {% endblock %}

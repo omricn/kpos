@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <a href="{% url 'salesperson_list' %}" class="text-decoration-none text-muted small">
+      <i class="bi bi-chevron-left me-1"></i>Sales Reps
+    </a>
+    <h4 class="mb-1 fw-bold mt-1">Customer Rep Assignments</h4>
+    <p class="text-muted small mb-0">
+      Assign a Kramer rep to specific end customers. Assignments take effect from today — past invoices are not changed.
+    </p>
+  </div>
+</div>
+
+<!-- Search -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="d-flex gap-2" method="get">
+      <input type="text" name="q" class="form-control" placeholder="Search customer name…" value="{{ search }}" style="max-width:340px">
+      <button class="btn btn-kramer px-4" type="submit">
+        <i class="bi bi-search me-1"></i>Search
+      </button>
+      {% if search %}
+      <a class="btn btn-outline-secondary" href="{% url 'customer_reps' %}">
+        <i class="bi bi-x-lg"></i>
+      </a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Customer table -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
+    <h6 class="mb-0 fw-bold">
+      All Customers
+      <span class="text-muted fw-normal small ms-2">{% if search %}filtered{% endif %}</span>
+    </h6>
+    <span class="badge rounded-pill" style="background:rgba(130,5,180,0.12);color:var(--kramer-purple)">{{ customers|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr style="background:var(--bg-elevated)">
+          <th class="ps-4 py-3 text-uppercase small text-muted fw-semibold" style="letter-spacing:.05em">Customer</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Revenue ({{ selected_currency }})</th>
+          <th class="text-uppercase small text-muted fw-semibold text-end">Records</th>
+          <th class="text-uppercase small text-muted fw-semibold">Current Rep</th>
+          <th class="text-uppercase small text-muted fw-semibold">Effective From</th>
+          <th class="py-3"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td class="ps-4 fw-semibold">{{ c.customer_name }}</td>
+          <td class="text-end text-revenue fw-bold">{{ currency_symbol }}{{ c.total_revenue|floatformat:0|intcomma }}</td>
+          <td class="text-end text-muted small">{{ c.record_count|intcomma }}</td>
+          <td>
+            {% if c.assignment %}
+              <span class="badge rounded-pill" style="background:rgba(130,5,180,0.12);color:var(--kramer-purple);font-size:.85em">
+                <i class="bi bi-person-badge me-1"></i>{{ c.assignment.salesperson.agent_name }}
+              </span>
+            {% else %}
+              {% if c.default_rep %}
+                <span class="text-muted small">{{ c.default_rep }}</span>
+                <span class="text-muted" style="font-size:.75em;opacity:.65"> (distributor default)</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            {% endif %}
+          </td>
+          <td class="text-muted small">
+            {% if c.assignment %}{{ c.assignment.effective_from|date:"d M Y" }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end pe-4">
+            <button class="btn btn-outline-secondary btn-sm assign-btn"
+                    data-customer="{{ c.customer_name }}"
+                    data-bs-toggle="modal"
+                    data-bs-target="#assignModal">
+              <i class="bi bi-pencil-square me-1"></i>{% if c.assignment %}Change{% else %}Assign{% endif %}
+            </button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-5 text-muted">
+            <i class="bi bi-people display-4"></i>
+            <p class="mt-3">No customers found{% if search %} for "{{ search }}"{% endif %}.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Assign Modal -->
+<div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'customer_reps' %}{% if search %}?q={{ search }}{% endif %}">
+        {% csrf_token %}
+        <div class="modal-header" style="border-bottom:1px solid var(--border-color)">
+          <h5 class="modal-title fw-bold" id="assignModalLabel">
+            <i class="bi bi-person-badge me-2" style="color:var(--kramer-purple)"></i>Assign Rep
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">
+            Assigning a rep takes effect from <strong>today</strong>.
+            Past invoices for this customer are not affected.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Customer</label>
+            <input type="text" class="form-control" id="modalCustomerDisplay" readonly
+                   style="background:var(--bg-elevated);color:var(--text-primary)">
+            <input type="hidden" name="customer_name" id="modalCustomerName">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Sales Rep</label>
+            <select class="form-select" name="salesperson_id" required>
+              <option value="">— Select a rep —</option>
+              {% for sp in all_salespersons %}
+              <option value="{{ sp.pk }}">{{ sp.agent_name }}{% if sp.agent_code %} ({{ sp.agent_code }}){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--border-color)">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-kramer px-4">
+            <i class="bi bi-check-lg me-1"></i>Assign from today
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.assign-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const name = btn.dataset.customer;
+    document.getElementById('modalCustomerDisplay').value = name;
+    document.getElementById('modalCustomerName').value = name;
+  });
+});
+</script>
+{% endblock %}

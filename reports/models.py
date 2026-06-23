@@ -81,6 +81,12 @@ class POSRecord(models.Model):
     post_code = models.CharField(max_length=20, blank=True)
     telephone = models.CharField(max_length=50, blank=True)
 
+    # Per-invoice rep override: management can credit a specific invoice to any rep
+    salesperson_override = models.ForeignKey(
+        'PrioritySalesperson', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='override_records'
+    )
+
     class Meta:
         ordering = ['-invoice_date', 'customer_name']
 
@@ -125,6 +131,26 @@ class PrioritySalesperson(models.Model):
 
     def __str__(self):
         return f"{self.agent_code} — {self.agent_name}"
+
+
+class CustomerSalesRep(models.Model):
+    """Maps an end-customer name to a Kramer sales rep, effective from a given date.
+    Revenue for invoices on or after effective_from is attributed to this rep.
+    Earlier invoices keep whatever rep was assigned before (or the distributor default).
+    """
+    customer_name = models.CharField(max_length=200, db_index=True)
+    salesperson = models.ForeignKey(
+        PrioritySalesperson, on_delete=models.CASCADE, related_name='customer_assignments'
+    )
+    effective_from = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['customer_name', '-effective_from']
+        indexes = [models.Index(fields=['customer_name', 'effective_from'])]
+
+    def __str__(self):
+        return f"{self.customer_name} → {self.salesperson.agent_name} (from {self.effective_from})"
 
 
 class PriorityProduct(models.Model):

@@ -16,8 +16,8 @@
     <h4 class="mb-1 fw-bold mt-1">Sales Reps</h4>
     <p class="text-muted small mb-0">Distributor revenue by account manager — all figures in {{ selected_currency }}</p>
   </div>
-  <a href="{% url 'upload' %}" class="btn btn-sm btn-kramer">
-    <i class="bi bi-cloud-upload me-1"></i>Upload
+  <a href="{% url 'customer_reps' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-person-lines-fill me-1"></i>Customer Rep Assignments
   </a>
 </div>
 
@@ -54,7 +54,7 @@
       <div class="col-auto">
         <label class="filter-label">Sales Rep</label>
         <select class="form-select filter-input" name="salesperson" style="min-width:180px">
-          <option value="">All Managers</option>
+          <option value="">All Sales Reps</option>
           {% for sp in all_salespersons %}
           <option value="{{ sp }}" {% if selected_sp == sp %}selected{% endif %}>{{ sp }}</option>
           {% endfor %}
@@ -223,8 +223,41 @@ window.onThemeChange = function() {
   spChart.update('none');
 };
 
-// Flatpickr
+// Flatpickr + period stickiness via localStorage
 (function() {
+  const LS_PERIOD = 'kpos_sp_period';
+  const LS_FROM   = 'kpos_sp_date_from';
+  const LS_TO     = 'kpos_sp_date_to';
+  const today = new Date();
+  const urlParams = new URLSearchParams(window.location.search);
+
+  // If the page loaded without any date filter, restore the last saved period
+  const hasUrlDates = urlParams.get('date_from') || urlParams.get('date_to') || urlParams.get('period');
+  if (!hasUrlDates) {
+    const savedPeriod = localStorage.getItem(LS_PERIOD);
+    const savedFrom   = localStorage.getItem(LS_FROM);
+    const savedTo     = localStorage.getItem(LS_TO);
+    if (savedPeriod && savedPeriod !== 'all') {
+      // Redirect so the server filters by the saved dates
+      const params = new URLSearchParams();
+      params.set('period', savedPeriod);
+      if (savedFrom) params.set('date_from', savedFrom);
+      if (savedTo)   params.set('date_to',   savedTo);
+      window.location.replace('/salespersons/?' + params.toString());
+      return;
+    }
+  }
+
+  // Persist the current period/dates to localStorage
+  const currentPeriod = urlParams.get('period') || (hasUrlDates ? 'custom' : 'all');
+  localStorage.setItem(LS_PERIOD, currentPeriod);
+  if (urlParams.get('date_from')) localStorage.setItem(LS_FROM, urlParams.get('date_from'));
+  if (urlParams.get('date_to'))   localStorage.setItem(LS_TO,   urlParams.get('date_to'));
+  if (currentPeriod === 'all') {
+    localStorage.removeItem(LS_FROM);
+    localStorage.removeItem(LS_TO);
+  }
+
   const hiddenFrom = document.getElementById('spHiddenFrom').value;
   const hiddenTo   = document.getElementById('spHiddenTo').value;
   const fp = flatpickr('#spDatePicker', {
@@ -239,13 +272,19 @@ window.onThemeChange = function() {
   });
   if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
 
-  const today = new Date();
-  const urlParams = new URLSearchParams(window.location.search);
+  // Highlight active period button
   const activePeriod = urlParams.get('period') ||
     (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
   if (activePeriod) {
     const activeBtn = document.querySelector('#spPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
     if (activeBtn) activeBtn.classList.add('active');
+  }
+
+  function calcDates(p) {
+    if (p === 'mtd') return [new Date(today.getFullYear(), today.getMonth(), 1), today];
+    if (p === 'qtd') { const q = Math.floor(today.getMonth()/3)*3; return [new Date(today.getFullYear(), q, 1), today]; }
+    if (p === 'ytd') return [new Date(today.getFullYear(), 0, 1), today];
+    return [null, null];
   }
 
   document.querySelectorAll('#spPeriodPresets .period-btn').forEach(btn => {
@@ -254,23 +293,23 @@ window.onThemeChange = function() {
       this.classList.add('active');
       const p = this.dataset.period;
       document.getElementById('spHiddenPeriod').value = p;
-      let df = null, dt = null;
-      if (p === 'mtd') {
-        df = new Date(today.getFullYear(), today.getMonth(), 1); dt = today;
-      } else if (p === 'qtd') {
-        const qStart = Math.floor(today.getMonth() / 3) * 3;
-        df = new Date(today.getFullYear(), qStart, 1); dt = today;
-      } else if (p === 'ytd') {
-        df = new Date(today.getFullYear(), 0, 1); dt = today;
-      }
+      const [df, dt] = calcDates(p);
       if (df && dt) {
         fp.setDate([df, dt]);
-        document.getElementById('spHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
-        document.getElementById('spHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+        const fromStr = fp.formatDate(df, 'Y-m-d');
+        const toStr   = fp.formatDate(dt, 'Y-m-d');
+        document.getElementById('spHiddenFrom').value = fromStr;
+        document.getElementById('spHiddenTo').value   = toStr;
+        localStorage.setItem(LS_PERIOD, p);
+        localStorage.setItem(LS_FROM, fromStr);
+        localStorage.setItem(LS_TO,   toStr);
       } else {
         fp.clear();
         document.getElementById('spHiddenFrom').value = '';
         document.getElementById('spHiddenTo').value   = '';
+        localStorage.setItem(LS_PERIOD, 'all');
+        localStorage.removeItem(LS_FROM);
+        localStorage.removeItem(LS_TO);
       }
       document.getElementById('spFilterForm').submit();
     });

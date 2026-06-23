@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Distributor, POSUpload, POSRecord, PrioritySalesperson, PriorityProduct
+from .models import Distributor, POSUpload, POSRecord, PrioritySalesperson, PriorityProduct, CustomerSalesRep
 
 
 @admin.register(Distributor)
@@ -26,6 +26,14 @@ class PriorityProductAdmin(admin.ModelAdmin):
     search_fields = ['part_number', 'description']
     list_filter = ['status', 'family']
     readonly_fields = ['synced_at']
+
+
+@admin.register(CustomerSalesRep)
+class CustomerSalesRepAdmin(admin.ModelAdmin):
+    list_display = ['customer_name', 'salesperson', 'effective_from', 'created_at']
+    search_fields = ['customer_name', 'salesperson__agent_name']
+    list_filter = ['salesperson']
+    ordering = ['customer_name', '-effective_from']
 
 
 @admin.register(POSUpload)

@@ -73,7 +73,7 @@
       <div class="col-auto">
         <label class="filter-label">Sales Rep</label>
         <select class="form-select filter-input" name="salesperson" style="min-width:180px">
-          <option value="">All Managers</option>
+          <option value="">All Sales Reps</option>
           {% for sp in all_salespersons %}
           <option value="{{ sp }}" {% if selected_sp == sp %}selected{% endif %}>{{ sp }}</option>
           {% endfor %}

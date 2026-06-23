@@ -7,14 +7,14 @@ from datetime import datetime as dt_class
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.cache import cache
-from django.db.models import Sum, Count, Min, Max, Q, Case, When, F, DecimalField, ExpressionWrapper, Value, Subquery, OuterRef
+from django.db.models import Sum, Count, Min, Max, Q, Case, When, F, DecimalField, ExpressionWrapper, Value, Subquery, OuterRef, CharField, Exists
 from django.db.models.functions import TruncMonth, TruncWeek, ExtractYear, ExtractMonth
 from django.db.models.functions import Coalesce
 from django.conf import settings as django_settings
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
-from .models import Distributor, POSUpload, POSRecord, ExchangeRate, MonthlyRate, PriorityProduct
+from .models import Distributor, POSUpload, POSRecord, ExchangeRate, MonthlyRate, PriorityProduct, PrioritySalesperson, CustomerSalesRep
 from .forms import UploadForm
 from .parsers import get_parser
 
@@ -159,6 +159,70 @@ def _usd_sum_expr():
         ExpressionWrapper(F('invoiced_value') * rate_expr,
                           output_field=DecimalField(max_digits=15, decimal_places=4))
     )
+
+
+def _sum_expr(target='USD'):
+    """Like _usd_sum_expr but supports USD or EUR target currency. Safe for GROUP BY queries."""
+    field_idx = 0 if target == 'USD' else 1
+    monthly_rates = cache.get('kpos_monthly_rates')
+    if monthly_rates is None:
+        monthly_rates = {
+            (r.year, r.month, r.currency): (float(r.rate_to_usd), float(r.rate_to_eur))
+            for r in MonthlyRate.objects.all()
+        }
+        cache.set('kpos_monthly_rates', monthly_rates, 86400)
+    current_rates = cache.get('kpos_current_rates')
+    if current_rates is None:
+        current_rates = {
+            r.currency: (float(r.rate_to_usd), float(r.rate_to_eur))
+            for r in ExchangeRate.objects.all()
+        }
+        cache.set('kpos_current_rates', current_rates, 3600)
+    _df = DecimalField(max_digits=12, decimal_places=6)
+    cases = []
+    for (year, month, currency), rate_pair in monthly_rates.items():
+        cases.append(When(
+            invoice_date__year=year, invoice_date__month=month, currency=currency,
+            then=Value(Decimal(str(rate_pair[field_idx])), output_field=_df),
+        ))
+    for currency, rate_pair in current_rates.items():
+        cases.append(When(
+            currency=currency,
+            then=Value(Decimal(str(rate_pair[field_idx])), output_field=_df),
+        ))
+    rate_expr = Case(*cases, default=Value(Decimal('1'), output_field=_df), output_field=_df)
+    return Sum(
+        ExpressionWrapper(F('invoiced_value') * rate_expr,
+                          output_field=DecimalField(max_digits=15, decimal_places=4))
+    )
+
+
+def _effective_rep_annotations():
+    """Return (eff_rep_name_expr, eff_rep_code_expr) for annotating POSRecord querysets.
+    Priority: per-invoice override > customer assignment (latest effective_from <= invoice_date) > distributor default.
+    """
+    latest_csr = CustomerSalesRep.objects.filter(
+        customer_name=OuterRef('customer_name'),
+        effective_from__lte=OuterRef('invoice_date'),
+    ).order_by('-effective_from')
+
+    eff_name = Case(
+        When(salesperson_override__isnull=False, then=F('salesperson_override__agent_name')),
+        default=Coalesce(
+            Subquery(latest_csr.values('salesperson__agent_name')[:1]),
+            F('distributor__salesperson_name'),
+        ),
+        output_field=CharField(),
+    )
+    eff_code = Case(
+        When(salesperson_override__isnull=False, then=F('salesperson_override__agent_code')),
+        default=Coalesce(
+            Subquery(latest_csr.values('salesperson__agent_code')[:1]),
+            F('distributor__salesperson_code'),
+        ),
+        output_field=CharField(),
+    )
+    return eff_name, eff_code
 
 
 def _currency_symbol(currency):
@@ -535,7 +599,7 @@ def dashboard(request):
 
 def distributor_records(request, pk):
     distributor = get_object_or_404(Distributor, pk=pk)
-    records = POSRecord.objects.filter(distributor=distributor).select_related('upload')
+    records = POSRecord.objects.filter(distributor=distributor).select_related('upload', 'salesperson_override')
 
     # Filters
     q = request.GET.get('q', '').strip()
@@ -571,10 +635,15 @@ def distributor_records(request, pk):
         date_to=Max('invoice_date'),
     )
 
+    # Annotate each record with its effective rep (override > customer assignment > distributor)
+    eff_name, eff_code = _effective_rep_annotations()
+    records = records.annotate(eff_rep_name=eff_name)
+
     # Filter options
     categories = POSRecord.objects.filter(distributor=distributor).values_list(
         'product_level_1', flat=True).distinct().exclude(product_level_1='').order_by('product_level_1')
     uploads = distributor.uploads.all()
+    all_salespersons = list(PrioritySalesperson.objects.order_by('agent_name'))
 
     context = {
         'distributor': distributor,
@@ -582,6 +651,7 @@ def distributor_records(request, pk):
         'stats': stats,
         'categories': categories,
         'uploads': uploads,
+        'all_salespersons': all_salespersons,
         'filters': {
             'q': q,
             'date_from': date_from,
@@ -1294,21 +1364,24 @@ def salesperson_list(request):
     currency_symbol = _currency_symbol(selected_currency)
     rates = _get_rates()
 
-    qs = POSRecord.objects.filter(invoiced_value__isnull=False).exclude(distributor__salesperson_name='')
+    qs = POSRecord.objects.filter(invoiced_value__isnull=False, invoice_date__isnull=False)
     if date_from:
         qs = qs.filter(invoice_date__gte=date_from)
     if date_to:
         qs = qs.filter(invoice_date__lte=date_to)
-    if selected_sp:
-        qs = qs.filter(distributor__salesperson_name=selected_sp)
     if region:
         qs = qs.filter(distributor__region=region)
 
+    eff_name, eff_code = _effective_rep_annotations()
+    qs = qs.annotate(eff_rep_name=eff_name, eff_rep_code=eff_code).filter(eff_rep_name__gt='')
+
+    if selected_sp:
+        qs = qs.filter(eff_rep_name=selected_sp)
+
     sp_data = list(
-        _annotate_converted(qs, selected_currency, rates)
-        .values('distributor__salesperson_name', 'distributor__salesperson_code')
+        qs.values('eff_rep_name', 'eff_rep_code')
         .annotate(
-            revenue=Sum('converted_value'),
+            revenue=_sum_expr(selected_currency),
             units=Sum('quantity'),
             dist_count=Count('distributor', distinct=True),
             records=Count('id'),
@@ -1320,8 +1393,8 @@ def salesperson_list(request):
         s['revenue'] = float(s['revenue'] or 0)
         s['units'] = int(s['units'] or 0)
         s['share_pct'] = round(s['revenue'] / total_rev * 100, 1)
-        s['name'] = s['distributor__salesperson_name']
-        s['code'] = s['distributor__salesperson_code']
+        s['name'] = s['eff_rep_name']
+        s['code'] = s['eff_rep_code']
 
     top3 = sp_data[:3]
 
@@ -1331,12 +1404,15 @@ def salesperson_list(request):
         'revenue': [s['revenue'] for s in chart_items],
     })
 
-    all_salespersons = list(
+    dist_rep_names = set(
         Distributor.objects.exclude(salesperson_name='')
         .values_list('salesperson_name', flat=True)
-        .distinct()
-        .order_by('salesperson_name')
     )
+    csr_rep_names = set(
+        PrioritySalesperson.objects.filter(customer_assignments__isnull=False)
+        .values_list('agent_name', flat=True)
+    )
+    all_salespersons = sorted(dist_rep_names | csr_rep_names)
     all_regions = list(Distributor.objects.filter(region__gt='').values_list('region', flat=True).distinct().order_by('region'))
 
     return render(request, 'reports/salesperson_list.html', {
@@ -1353,6 +1429,117 @@ def salesperson_list(request):
         'selected_currency': selected_currency,
         'currency_symbol':   currency_symbol,
     })
+
+
+def customer_reps(request):
+    """Manage sales rep assignments per end-customer. Effective from today forward."""
+    selected_currency = request.session.get('currency', 'USD')
+    currency_symbol = _currency_symbol(selected_currency)
+    region = request.session.get('region', '')
+
+    if request.method == 'POST':
+        customer_name = request.POST.get('customer_name', '').strip()
+        salesperson_id = request.POST.get('salesperson_id', '').strip()
+        if customer_name and salesperson_id:
+            sp = get_object_or_404(PrioritySalesperson, pk=salesperson_id)
+            CustomerSalesRep.objects.create(
+                customer_name=customer_name,
+                salesperson=sp,
+                effective_from=date_cls.today(),
+            )
+            messages.success(request, f'{sp.agent_name} assigned to {customer_name} from today.')
+        return redirect('customer_reps')
+
+    search = request.GET.get('q', '').strip()
+
+    # Top customers by revenue
+    cust_qs = (
+        POSRecord.objects
+        .filter(invoiced_value__isnull=False, invoice_date__isnull=False)
+        .exclude(customer_name='')
+    )
+    if region:
+        cust_qs = cust_qs.filter(distributor__region=region)
+    if search:
+        cust_qs = cust_qs.filter(customer_name__icontains=search)
+
+    customers = list(
+        cust_qs
+        .values('customer_name')
+        .annotate(
+            total_revenue=_sum_expr(selected_currency),
+            record_count=Count('id'),
+        )
+        .order_by('customer_name')
+    )
+
+    # Current assignment per customer (latest effective_from per customer_name)
+    all_csr = (
+        CustomerSalesRep.objects
+        .select_related('salesperson')
+        .order_by('customer_name', '-effective_from')
+    )
+    current_assignment = {}
+    for csr in all_csr:
+        if csr.customer_name not in current_assignment:
+            current_assignment[csr.customer_name] = csr
+
+    # Default (distributor) rep per customer — pick the most common distributor rep
+    default_rep_rows = (
+        POSRecord.objects
+        .filter(distributor__salesperson_name__isnull=False)
+        .exclude(distributor__salesperson_name='')
+        .exclude(customer_name='')
+        .values('customer_name', 'distributor__salesperson_name')
+        .annotate(cnt=Count('id'))
+        .order_by('customer_name', '-cnt')
+    )
+    default_rep_map = {}
+    for row in default_rep_rows:
+        if row['customer_name'] not in default_rep_map:
+            default_rep_map[row['customer_name']] = row['distributor__salesperson_name']
+
+    for c in customers:
+        c['total_revenue'] = float(c['total_revenue'] or 0)
+        c['assignment'] = current_assignment.get(c['customer_name'])
+        c['default_rep'] = default_rep_map.get(c['customer_name'], '')
+
+    all_salespersons = list(PrioritySalesperson.objects.order_by('agent_name'))
+
+    return render(request, 'reports/customer_reps.html', {
+        'customers': customers,
+        'all_salespersons': all_salespersons,
+        'search': search,
+        'currency_symbol': currency_symbol,
+        'selected_currency': selected_currency,
+        'page_title': 'Customer Rep Assignments',
+    })
+
+
+def set_record_rep(request):
+    """AJAX POST: set or clear the per-invoice salesperson override on a POSRecord."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    record_id = request.POST.get('record_id', '').strip()
+    salesperson_id = request.POST.get('salesperson_id', '').strip()
+
+    record = get_object_or_404(POSRecord, pk=record_id)
+
+    if salesperson_id:
+        sp = get_object_or_404(PrioritySalesperson, pk=salesperson_id)
+        record.salesperson_override = sp
+        record.save(update_fields=['salesperson_override'])
+        return JsonResponse({
+            'ok': True,
+            'rep_name': sp.agent_name,
+            'rep_id': sp.pk,
+            'source': 'override',
+        })
+    else:
+        record.salesperson_override = None
+        record.save(update_fields=['salesperson_override'])
+        return JsonResponse({'ok': True, 'rep_name': None, 'source': 'cleared'})
 
 
 def weekly_view(request):
