@@ -375,14 +375,6 @@ def country_display(raw):
 # ── Views ──────────────────────────────────────────────────────────────────────
 
 def dashboard(request):
-    import traceback as _tb
-    try:
-        return _dashboard_inner(request)
-    except Exception:
-        return HttpResponse('<pre>' + _tb.format_exc() + '</pre>', status=500)
-
-
-def _dashboard_inner(request):
     date_from = request.GET.get('date_from', '')
     date_to   = request.GET.get('date_to', '')
     distributor_id = request.GET.get('distributor', '')
@@ -514,7 +506,7 @@ def _dashboard_inner(request):
             .order_by('-revenue')[:10]
         )
         if top_products:
-            max_rev = float(max(p['revenue'] for p in top_products) or 1)
+            max_rev = float(max((p['revenue'] or 0) for p in top_products) or 1)
             for p in top_products:
                 p['revenue'] = float(p['revenue'] or 0)
                 p['pct'] = round(p['revenue'] / max_rev * 100)
@@ -530,7 +522,7 @@ def _dashboard_inner(request):
             .order_by('-revenue')[:5]
         )
         if top_salespersons:
-            max_sp_rev = float(max(sp['revenue'] for sp in top_salespersons) or 1)
+            max_sp_rev = float(max((sp['revenue'] or 0) for sp in top_salespersons) or 1)
             for sp in top_salespersons:
                 sp['revenue'] = float(sp['revenue'] or 0)
                 sp['units'] = int(sp['units'] or 0)
