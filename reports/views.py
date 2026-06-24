@@ -375,6 +375,14 @@ def country_display(raw):
 # ── Views ──────────────────────────────────────────────────────────────────────
 
 def dashboard(request):
+    import traceback as _tb
+    try:
+        return _dashboard_inner(request)
+    except Exception:
+        return HttpResponse('<pre>' + _tb.format_exc() + '</pre>', status=500)
+
+
+def _dashboard_inner(request):
     date_from = request.GET.get('date_from', '')
     date_to   = request.GET.get('date_to', '')
     distributor_id = request.GET.get('distributor', '')
