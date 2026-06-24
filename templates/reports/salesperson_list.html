@@ -67,7 +67,7 @@
           <i class="bi bi-funnel-fill me-1"></i>Apply
         </button>
         {% if has_filters %}
-        <a class="btn btn-outline-secondary filter-btn" href="{% url 'salesperson_list' %}">
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'salesperson_list' %}?date_from=&date_to=">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
         {% endif %}
@@ -223,40 +223,10 @@ window.onThemeChange = function() {
   spChart.update('none');
 };
 
-// Flatpickr + period stickiness via localStorage
+// Flatpickr + period button highlighting
 (function() {
-  const LS_PERIOD = 'kpos_sp_period';
-  const LS_FROM   = 'kpos_sp_date_from';
-  const LS_TO     = 'kpos_sp_date_to';
   const today = new Date();
   const urlParams = new URLSearchParams(window.location.search);
-
-  // If the page loaded without any date filter, restore the last saved period
-  const hasUrlDates = urlParams.get('date_from') || urlParams.get('date_to') || urlParams.get('period');
-  if (!hasUrlDates) {
-    const savedPeriod = localStorage.getItem(LS_PERIOD);
-    const savedFrom   = localStorage.getItem(LS_FROM);
-    const savedTo     = localStorage.getItem(LS_TO);
-    if (savedPeriod && savedPeriod !== 'all') {
-      // Redirect so the server filters by the saved dates
-      const params = new URLSearchParams();
-      params.set('period', savedPeriod);
-      if (savedFrom) params.set('date_from', savedFrom);
-      if (savedTo)   params.set('date_to',   savedTo);
-      window.location.replace('/salespersons/?' + params.toString());
-      return;
-    }
-  }
-
-  // Persist the current period/dates to localStorage
-  const currentPeriod = urlParams.get('period') || (hasUrlDates ? 'custom' : 'all');
-  localStorage.setItem(LS_PERIOD, currentPeriod);
-  if (urlParams.get('date_from')) localStorage.setItem(LS_FROM, urlParams.get('date_from'));
-  if (urlParams.get('date_to'))   localStorage.setItem(LS_TO,   urlParams.get('date_to'));
-  if (currentPeriod === 'all') {
-    localStorage.removeItem(LS_FROM);
-    localStorage.removeItem(LS_TO);
-  }
 
   const hiddenFrom = document.getElementById('spHiddenFrom').value;
   const hiddenTo   = document.getElementById('spHiddenTo').value;
@@ -296,20 +266,12 @@ window.onThemeChange = function() {
       const [df, dt] = calcDates(p);
       if (df && dt) {
         fp.setDate([df, dt]);
-        const fromStr = fp.formatDate(df, 'Y-m-d');
-        const toStr   = fp.formatDate(dt, 'Y-m-d');
-        document.getElementById('spHiddenFrom').value = fromStr;
-        document.getElementById('spHiddenTo').value   = toStr;
-        localStorage.setItem(LS_PERIOD, p);
-        localStorage.setItem(LS_FROM, fromStr);
-        localStorage.setItem(LS_TO,   toStr);
+        document.getElementById('spHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
+        document.getElementById('spHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
       } else {
         fp.clear();
         document.getElementById('spHiddenFrom').value = '';
         document.getElementById('spHiddenTo').value   = '';
-        localStorage.setItem(LS_PERIOD, 'all');
-        localStorage.removeItem(LS_FROM);
-        localStorage.removeItem(LS_TO);
       }
       document.getElementById('spFilterForm').submit();
     });

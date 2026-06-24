@@ -1355,8 +1355,6 @@ def revenue_view(request):
 
 
 def salesperson_list(request):
-    date_from = request.GET.get('date_from', '').strip()
-    date_to   = request.GET.get('date_to', '').strip()
     selected_sp = request.GET.get('salesperson', '').strip()
 
     # Region: explicit URL param updates session; navigation falls back to session
@@ -1367,6 +1365,19 @@ def salesperson_list(request):
         request.session.modified = True
     else:
         region = request.session.get('region', '')
+
+    # Period/dates: same sticky pattern as region
+    date_from_param = request.GET.get('date_from')
+    date_to_param   = request.GET.get('date_to')
+    if date_from_param is not None or date_to_param is not None:
+        date_from = (date_from_param or '').strip()
+        date_to   = (date_to_param   or '').strip()
+        request.session['sp_date_from'] = date_from
+        request.session['sp_date_to']   = date_to
+        request.session.modified = True
+    else:
+        date_from = request.session.get('sp_date_from', '')
+        date_to   = request.session.get('sp_date_to',   '')
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
