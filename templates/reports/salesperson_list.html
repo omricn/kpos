@@ -202,7 +202,7 @@ const spChart = new Chart(spCtx, {
     scales: {
       x: {
         grid: { color: isDark() ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
-        ticks: { color: isDark() ? '#636366' : '#666', callback: v => fmtMoney(v) }
+        ticks: { color: isDark() ? '#DCDDDE' : '#666', callback: v => fmtMoney(v) }
       },
       y: {
         grid: { display: false },
@@ -215,7 +215,7 @@ const spChart = new Chart(spCtx, {
 window.onThemeChange = function() {
   const dark = isDark();
   spChart.options.scales.x.grid.color = dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
-  spChart.options.scales.x.ticks.color = dark ? '#636366' : '#666';
+  spChart.options.scales.x.ticks.color = dark ? '#DCDDDE' : '#666';
   spChart.options.scales.y.ticks.color = dark ? '#DCDDDE' : '#333';
   spChart.update('none');
 };

@@ -120,9 +120,9 @@ const chartConfig = {
     },
     scales: {
       x: { grid: { display: false },
-           ticks: { color: isDark() ? '#636366' : '#666', font: { size: 11 }, maxRotation: 45 } },
+           ticks: { color: isDark() ? '#DCDDDE' : '#666', font: { size: 11 }, maxRotation: 45 } },
       y: { grid: { color: isDark() ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
-           ticks: { color: isDark() ? '#636366' : '#666', callback: v => fmtMoney(v) } }
+           ticks: { color: isDark() ? '#DCDDDE' : '#666', callback: v => fmtMoney(v) } }
     }
   }
 };
@@ -149,8 +149,8 @@ document.querySelectorAll('#chartTypeToggle button').forEach(btn => {
 
 window.onThemeChange = function() {
   const dark = isDark();
-  chart.options.scales.x.ticks.color = dark ? '#636366' : '#666';
-  chart.options.scales.y.ticks.color = dark ? '#636366' : '#666';
+  chart.options.scales.x.ticks.color = dark ? '#DCDDDE' : '#666';
+  chart.options.scales.y.ticks.color = dark ? '#DCDDDE' : '#666';
   chart.options.scales.y.grid.color  = dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
   chart.options.plugins.legend.labels.color = dark ? '#DCDDDE' : '#44445a';
   chart.update('none');

@@ -192,7 +192,7 @@ const chartConfig = {
     },
     scales: {
       x: { grid: { color: isDark() ? 'rgba(255,255,255,0.07)' : '#f0f0f0' },
-           ticks: { color: isDark() ? '#636366' : '#666',
+           ticks: { color: isDark() ? '#DCDDDE' : '#666',
                     callback: v => currentMetric === 'units' ? v.toLocaleString() : fmtMoney(v) } },
       y: { grid: { display: false },
            ticks: { color: isDark() ? '#DCDDDE' : '#333', font: { size: 10 } } }
@@ -216,7 +216,7 @@ document.querySelectorAll('#metricToggle button').forEach(btn => {
 window.onThemeChange = function() {
   const dark = isDark();
   chart.options.scales.x.grid.color = dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
-  chart.options.scales.x.ticks.color = dark ? '#636366' : '#666';
+  chart.options.scales.x.ticks.color = dark ? '#DCDDDE' : '#666';
   chart.options.scales.y.ticks.color = dark ? '#DCDDDE' : '#333';
   chart.update('none');
 };

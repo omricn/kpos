@@ -375,8 +375,20 @@ def country_display(raw):
 # ── Views ──────────────────────────────────────────────────────────────────────
 
 def dashboard(request):
-    date_from = request.GET.get('date_from', '')
-    date_to   = request.GET.get('date_to', '')
+    date_from_param = request.GET.get('date_from')
+    date_to_param   = request.GET.get('date_to')
+    if date_from_param is not None or date_to_param is not None:
+        date_from = (date_from_param or '').strip()
+        date_to   = (date_to_param   or '').strip()
+        period    = (request.GET.get('period') or '').strip()
+        request.session['dash_date_from'] = date_from
+        request.session['dash_date_to']   = date_to
+        request.session['dash_period']    = period
+        request.session.modified = True
+    else:
+        date_from = request.session.get('dash_date_from', '')
+        date_to   = request.session.get('dash_date_to',   '')
+        period    = request.session.get('dash_period',    '')
     distributor_id = request.GET.get('distributor', '')
 
     # Region: explicit URL param updates session; navigation falls back to session
@@ -620,6 +632,7 @@ def dashboard(request):
             'date_to':      date_to,
             'region':       region,
             'distributor':  distributor_id,
+            'period':       period,
         },
         'top_products':      top_products,
         'top_salespersons':  top_salespersons,
