@@ -83,13 +83,15 @@
         <input type="text" name="q" class="form-control form-control-sm"
                placeholder="Customer, product, order..." value="{{ filters.q }}">
       </div>
-      <div class="col-md-2">
-        <label class="form-label small text-muted mb-1">From date</label>
-        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ filters.date_from }}">
-      </div>
-      <div class="col-md-2">
-        <label class="form-label small text-muted mb-1">To date</label>
-        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ filters.date_to }}">
+      <div class="col-md-3">
+        <label class="form-label small text-muted mb-1">Date Range</label>
+        <div class="date-range-wrap">
+          <i class="bi bi-calendar3 date-range-icon"></i>
+          <input type="text" id="recDatePicker" class="form-control form-control-sm date-range-input"
+                 placeholder="Select date range…" autocomplete="off" readonly>
+          <input type="hidden" name="date_from" id="recHiddenFrom" value="{{ filters.date_from }}">
+          <input type="hidden" name="date_to"   id="recHiddenTo"   value="{{ filters.date_to }}">
+        </div>
       </div>
       <div class="col-md-2">
         <label class="form-label small text-muted mb-1">Category</label>
@@ -274,6 +276,7 @@
 {% endblock %}
 
 {% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
 <style>
 .rep-override { color: var(--kramer-purple); font-weight: 600; }
 .rep-edit-btn { opacity: 0; transition: opacity .15s; }
@@ -283,6 +286,28 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+<script>
+(function() {
+  const hiddenFrom = document.getElementById('recHiddenFrom').value;
+  const hiddenTo   = document.getElementById('recHiddenTo').value;
+  let fpReady = false;
+  const fp = flatpickr('#recDatePicker', {
+    mode: 'range',
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    onChange: function(selectedDates) {
+      document.getElementById('recHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
+      document.getElementById('recHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+      if (fpReady && selectedDates.length === 2) document.querySelector('form').submit();
+    },
+  });
+  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
+  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
+  fpReady = true;
+})();
+</script>
 <script>
 const CSRF = '{{ csrf_token }}';
 const SET_REP_URL = '{% url "set_record_rep" %}';

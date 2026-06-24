@@ -468,8 +468,31 @@ def dashboard(request):
             .order_by('month', 'distributor__region')
         )
         months_sorted = sorted(set(r['month'] for r in monthly_qs))
-        month_labels  = [m.strftime(_lbl_fmt) for m in months_sorted]
-        month_keys    = [m.strftime(_key_fmt)  for m in months_sorted]
+        # Build axis covering the full selected range so missing days show as flat zero
+        if date_from and date_to:
+            try:
+                _df_obj = dt_class.strptime(date_from, '%Y-%m-%d')
+                _dt_obj = dt_class.strptime(date_to, '%Y-%m-%d')
+                if use_daily:
+                    month_keys = []
+                    _cur = _df_obj
+                    while _cur <= _dt_obj:
+                        month_keys.append(_cur.strftime(_key_fmt))
+                        _cur += timedelta(days=1)
+                else:
+                    month_keys = []
+                    _cur = _df_obj.replace(day=1)
+                    _end = _dt_obj.replace(day=1)
+                    while _cur <= _end:
+                        month_keys.append(_cur.strftime(_key_fmt))
+                        _cur = _cur.replace(month=_cur.month + 1) if _cur.month < 12 else _cur.replace(year=_cur.year + 1, month=1)
+                month_labels = [dt_class.strptime(k, _key_fmt).strftime(_lbl_fmt) for k in month_keys]
+            except ValueError:
+                month_labels = [m.strftime(_lbl_fmt) for m in months_sorted]
+                month_keys   = [m.strftime(_key_fmt)  for m in months_sorted]
+        else:
+            month_labels = [m.strftime(_lbl_fmt) for m in months_sorted]
+            month_keys   = [m.strftime(_key_fmt)  for m in months_sorted]
         region_order  = {}
         for r in monthly_qs:
             reg = r['distributor__region'] or 'Unknown'
