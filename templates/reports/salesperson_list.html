@@ -227,21 +227,20 @@ window.onThemeChange = function() {
 
   const hiddenFrom = document.getElementById('spHiddenFrom').value;
   const hiddenTo   = document.getElementById('spHiddenTo').value;
-  let fpReady = false;
   const fp = flatpickr('#spDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
     altInput: true,
     altFormat: 'M j, Y',
-    onChange: function(selectedDates) {
+    onChange: function(selectedDates, dateStr, instance) {
+      if (!instance.isOpen) return;  // skip programmatic setDate calls
       document.getElementById('spHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('spHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
-      if (fpReady && selectedDates.length === 2) document.getElementById('spFilterForm').submit();
+      if (selectedDates.length === 2) document.getElementById('spFilterForm').submit();
     },
   });
   if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
   else if (hiddenFrom) fp.setDate([hiddenFrom], false);
-  fpReady = true;
 
   // Highlight active period button — use server-side value (works even when dates come from session)
   const activePeriod = '{{ filters.period }}' || (!hiddenFrom && !hiddenTo ? 'all' : null);
