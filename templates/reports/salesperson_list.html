@@ -227,6 +227,7 @@ window.onThemeChange = function() {
 
   const hiddenFrom = document.getElementById('spHiddenFrom').value;
   const hiddenTo   = document.getElementById('spHiddenTo').value;
+  let fpReady = false;
   const fp = flatpickr('#spDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
@@ -235,12 +236,12 @@ window.onThemeChange = function() {
     onChange: function(selectedDates) {
       document.getElementById('spHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('spHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+      if (fpReady && selectedDates.length === 2) document.getElementById('spFilterForm').submit();
     },
-    onClose: function(selectedDates) {
-      if (selectedDates.length === 2) document.getElementById('spFilterForm').submit();
-    }
   });
-  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
+  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
+  fpReady = true;
 
   // Highlight active period button
   const activePeriod = urlParams.get('period') ||
@@ -265,9 +266,9 @@ window.onThemeChange = function() {
       document.getElementById('spHiddenPeriod').value = p;
       const [df, dt] = calcDates(p);
       if (df && dt) {
-        fp.setDate([df, dt]);
         document.getElementById('spHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
         document.getElementById('spHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+        fp.setDate([df, dt], false);
       } else {
         fp.clear();
         document.getElementById('spHiddenFrom').value = '';

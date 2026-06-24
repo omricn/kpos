@@ -268,6 +268,8 @@
 (function() {
   const hiddenFrom = document.getElementById('hiddenDateFrom').value;
   const hiddenTo   = document.getElementById('hiddenDateTo').value;
+  let fpReady = false;
+
   const fp = flatpickr('#dateRangePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
@@ -276,12 +278,16 @@
     onChange: function(selectedDates) {
       document.getElementById('hiddenDateFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('hiddenDateTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+      // Auto-submit only after user interaction (not during page-load setDate)
+      if (fpReady && selectedDates.length === 2) {
+        document.getElementById('filterForm').submit();
+      }
     },
-    onClose: function(selectedDates) {
-      if (selectedDates.length === 2) document.getElementById('filterForm').submit();
-    }
   });
-  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+  // Pass false so setDate doesn't trigger onChange (hidden inputs already have correct values from template)
+  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
+  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
+  fpReady = true;
 
   // Period preset buttons — set active on click and restore on page load
   const today = new Date();
@@ -312,9 +318,9 @@
         dt = today;
       }
       if (df && dt) {
-        fp.setDate([df, dt]);
         document.getElementById('hiddenDateFrom').value = fp.formatDate(df, 'Y-m-d');
         document.getElementById('hiddenDateTo').value   = fp.formatDate(dt, 'Y-m-d');
+        fp.setDate([df, dt], false);
       } else {
         fp.clear();
         document.getElementById('hiddenDateFrom').value = '';

@@ -256,6 +256,7 @@ document.getElementById('distJump').addEventListener('change', function() {
 (function() {
   const hiddenFrom = document.getElementById('distHiddenFrom').value;
   const hiddenTo   = document.getElementById('distHiddenTo').value;
+  let fpReady = false;
   const fp = flatpickr('#distDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
@@ -264,12 +265,12 @@ document.getElementById('distJump').addEventListener('change', function() {
     onChange: function(selectedDates) {
       document.getElementById('distHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('distHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+      if (fpReady && selectedDates.length === 2) document.getElementById('distFilterForm').submit();
     },
-    onClose: function(selectedDates) {
-      if (selectedDates.length === 2) document.getElementById('distFilterForm').submit();
-    }
   });
-  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
+  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
+  fpReady = true;
 
   // Period preset buttons — set active on click and restore on page load
   const today = new Date();
@@ -297,9 +298,9 @@ document.getElementById('distJump').addEventListener('change', function() {
         df = new Date(today.getFullYear(), 0, 1); dt = today;
       }
       if (df && dt) {
-        fp.setDate([df, dt]);
         document.getElementById('distHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
         document.getElementById('distHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+        fp.setDate([df, dt], false);
       } else {
         fp.clear();
         document.getElementById('distHiddenFrom').value = '';

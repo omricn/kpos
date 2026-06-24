@@ -143,6 +143,7 @@
 (function() {
   const hiddenFrom = document.getElementById('productHiddenFrom').value;
   const hiddenTo   = document.getElementById('productHiddenTo').value;
+  let fpReady = false;
   const fp = flatpickr('#productDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
@@ -151,12 +152,12 @@
     onChange: function(selectedDates) {
       document.getElementById('productHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('productHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+      if (fpReady && selectedDates.length === 2) document.getElementById('productFilterForm').submit();
     },
-    onClose: function(selectedDates) {
-      if (selectedDates.length === 2) document.getElementById('productFilterForm').submit();
-    }
   });
-  if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);
+  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
+  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
+  fpReady = true;
 
   const urlParams = new URLSearchParams(window.location.search);
   const activePeriod = urlParams.get('period') ||
@@ -190,9 +191,9 @@
         df = new Date(today.getFullYear(), 0, 1); dt = today;
       }
       if (df && dt) {
-        fp.setDate([df, dt]);
         document.getElementById('productHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
         document.getElementById('productHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
+        fp.setDate([df, dt], false);
       } else {
         fp.clear();
         document.getElementById('productHiddenFrom').value = '';
