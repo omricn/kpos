@@ -243,9 +243,8 @@ window.onThemeChange = function() {
   else if (hiddenFrom) fp.setDate([hiddenFrom], false);
   fpReady = true;
 
-  // Highlight active period button
-  const activePeriod = urlParams.get('period') ||
-    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
+  // Highlight active period button — use server-side value (works even when dates come from session)
+  const activePeriod = '{{ filters.period }}' || (!hiddenFrom && !hiddenTo ? 'all' : null);
   if (activePeriod) {
     const activeBtn = document.querySelector('#spPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
     if (activeBtn) activeBtn.classList.add('active');

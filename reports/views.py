@@ -1386,12 +1386,15 @@ def salesperson_list(request):
     if date_from_param is not None or date_to_param is not None:
         date_from = (date_from_param or '').strip()
         date_to   = (date_to_param   or '').strip()
+        period    = (request.GET.get('period') or '').strip()
         request.session['sp_date_from'] = date_from
         request.session['sp_date_to']   = date_to
+        request.session['sp_period']    = period
         request.session.modified = True
     else:
         date_from = request.session.get('sp_date_from', '')
         date_to   = request.session.get('sp_date_to',   '')
+        period    = request.session.get('sp_period',    '')
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
@@ -1457,7 +1460,7 @@ def salesperson_list(request):
         'all_regions':     all_regions,
         'selected_region': region,
         'has_filters':     bool(date_from or date_to or selected_sp or region),
-        'filters':         {'date_from': date_from, 'date_to': date_to, 'region': region},
+        'filters':         {'date_from': date_from, 'date_to': date_to, 'region': region, 'period': period},
         'page_title':      'Account Managers',
         'selected_currency': selected_currency,
         'currency_symbol':   currency_symbol,
