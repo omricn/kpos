@@ -48,10 +48,10 @@
       <div class="col-12 col-xl-auto">
         <label class="filter-label">Period</label>
         <div class="btn-group btn-group-sm" id="distPeriodPresets">
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'mtd' %} active{% endif %}" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'qtd' %} active{% endif %}" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'ytd' %} active{% endif %}" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'all' or not filters.period and not filters.date_from and not filters.date_to %} active{% endif %}" data-period="all">All</button>
         </div>
       </div>
 
@@ -256,32 +256,22 @@ document.getElementById('distJump').addEventListener('change', function() {
 (function() {
   const hiddenFrom = document.getElementById('distHiddenFrom').value;
   const hiddenTo   = document.getElementById('distHiddenTo').value;
-  let fpReady = false;
   const fp = flatpickr('#distDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
     altInput: true,
     altFormat: 'M j, Y',
-    onChange: function(selectedDates) {
+    onChange: function(selectedDates, dateStr, instance) {
+      if (!instance.isOpen) return;
       document.getElementById('distHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('distHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
-      if (fpReady && selectedDates.length === 2) document.getElementById('distFilterForm').submit();
+      if (selectedDates.length === 2) document.getElementById('distFilterForm').submit();
     },
   });
   if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
   else if (hiddenFrom) fp.setDate([hiddenFrom], false);
-  fpReady = true;
 
-  // Period preset buttons — set active on click and restore on page load
   const today = new Date();
-  const urlParams = new URLSearchParams(window.location.search);
-  const activePeriod = urlParams.get('period') ||
-    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
-  if (activePeriod) {
-    const activeBtn = document.querySelector('#distPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
-    if (activeBtn) activeBtn.classList.add('active');
-  }
-
   document.querySelectorAll('#distPeriodPresets .period-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       document.querySelectorAll('#distPeriodPresets .period-btn').forEach(b => b.classList.remove('active'));

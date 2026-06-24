@@ -23,10 +23,10 @@
       <div class="col-12 col-xl-auto">
         <label class="filter-label">Period</label>
         <div class="btn-group btn-group-sm" id="productPeriodPresets">
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'mtd' %} active{% endif %}" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'qtd' %} active{% endif %}" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'ytd' %} active{% endif %}" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'all' or not filters.period and not filters.date_from and not filters.date_to %} active{% endif %}" data-period="all">All</button>
         </div>
       </div>
 
@@ -143,29 +143,20 @@
 (function() {
   const hiddenFrom = document.getElementById('productHiddenFrom').value;
   const hiddenTo   = document.getElementById('productHiddenTo').value;
-  let fpReady = false;
   const fp = flatpickr('#productDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
     altInput: true,
     altFormat: 'M j, Y',
-    onChange: function(selectedDates) {
+    onChange: function(selectedDates, dateStr, instance) {
+      if (!instance.isOpen) return;
       document.getElementById('productHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('productHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
-      if (fpReady && selectedDates.length === 2) document.getElementById('productFilterForm').submit();
+      if (selectedDates.length === 2) document.getElementById('productFilterForm').submit();
     },
   });
   if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
   else if (hiddenFrom) fp.setDate([hiddenFrom], false);
-  fpReady = true;
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const activePeriod = urlParams.get('period') ||
-    (!urlParams.get('date_from') && !urlParams.get('date_to') ? 'all' : null);
-  if (activePeriod) {
-    const activeBtn = document.querySelector('#productPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
-    if (activeBtn) activeBtn.classList.add('active');
-  }
 
   document.querySelectorAll('#productSortBtns .sort-btn').forEach(btn => {
     btn.addEventListener('click', function() {

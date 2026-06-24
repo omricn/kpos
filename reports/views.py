@@ -830,8 +830,20 @@ def distributor_list(request):
         request.session.modified = True
     else:
         selected_region = request.session.get('region', '')
-    date_from = request.GET.get('date_from', '').strip()
-    date_to = request.GET.get('date_to', '').strip()
+    date_from_param = request.GET.get('date_from')
+    date_to_param   = request.GET.get('date_to')
+    if date_from_param is not None or date_to_param is not None:
+        date_from = (date_from_param or '').strip()
+        date_to   = (date_to_param   or '').strip()
+        period    = (request.GET.get('period') or '').strip()
+        request.session['dist_date_from'] = date_from
+        request.session['dist_date_to']   = date_to
+        request.session['dist_period']    = period
+        request.session.modified = True
+    else:
+        date_from = request.session.get('dist_date_from', '')
+        date_to   = request.session.get('dist_date_to',   '')
+        period    = request.session.get('dist_period',    '')
     selected_sp = request.GET.get('salesperson', '').strip()
 
     selected_currency = request.session.get('currency', 'USD')
@@ -960,7 +972,7 @@ def distributor_list(request):
         'chart_data': chart_data,
         'timeseries_data': timeseries_data,
         'has_filters': bool(date_from or date_to or selected_sp),
-        'filters': {'date_from': date_from, 'date_to': date_to, 'region': selected_region, 'salesperson': selected_sp},
+        'filters': {'date_from': date_from, 'date_to': date_to, 'region': selected_region, 'salesperson': selected_sp, 'period': period},
         'jump_distributors': jump_distributors,
         'page_title': 'Distributors',
         'selected_currency': selected_currency,
@@ -971,8 +983,20 @@ def distributor_list(request):
 
 
 def product_list(request):
-    date_from = request.GET.get('date_from', '').strip()
-    date_to   = request.GET.get('date_to', '').strip()
+    date_from_param = request.GET.get('date_from')
+    date_to_param   = request.GET.get('date_to')
+    if date_from_param is not None or date_to_param is not None:
+        date_from = (date_from_param or '').strip()
+        date_to   = (date_to_param   or '').strip()
+        period    = (request.GET.get('period') or '').strip()
+        request.session['prod_date_from'] = date_from
+        request.session['prod_date_to']   = date_to
+        request.session['prod_period']    = period
+        request.session.modified = True
+    else:
+        date_from = request.session.get('prod_date_from', '')
+        date_to   = request.session.get('prod_date_to',   '')
+        period    = request.session.get('prod_period',    '')
     search    = request.GET.get('q', '').strip()
     sort_by   = request.GET.get('sort', 'revenue')
     if sort_by not in ('revenue', 'units'):
@@ -1025,7 +1049,7 @@ def product_list(request):
 
     return render(request, 'reports/product_list.html', {
         'products': products,
-        'filters': {'date_from': date_from, 'date_to': date_to, 'q': search, 'region': region, 'sort': sort_by},
+        'filters': {'date_from': date_from, 'date_to': date_to, 'q': search, 'region': region, 'sort': sort_by, 'period': period},
         'has_filters': bool(date_from or date_to or search),
         'sort_by': sort_by,
         'all_regions': all_regions,
