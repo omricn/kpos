@@ -37,9 +37,6 @@
           <i class="bi bi-calendar3 date-range-icon"></i>
           <input type="text" id="productDatePicker" class="form-control filter-input date-range-input"
                  placeholder="Select date range…" autocomplete="off" readonly>
-          <input type="hidden" name="date_from" id="productHiddenFrom" value="{{ filters.date_from }}">
-          <input type="hidden" name="date_to"   id="productHiddenTo"   value="{{ filters.date_to }}">
-          <input type="hidden" name="period"    id="productHiddenPeriod" value="{{ filters.period }}">
         </div>
       </div>
 
@@ -71,7 +68,7 @@
           <i class="bi bi-funnel-fill me-1"></i>Apply
         </button>
         {% if has_filters %}
-        <a class="btn btn-outline-secondary filter-btn" href="{% url 'product_list' %}">
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'set_period' %}?clear=1&next={% url 'product_list' %}">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
         {% endif %}
@@ -141,8 +138,6 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
 <script>
 (function() {
-  const hiddenFrom = document.getElementById('productHiddenFrom').value;
-  const hiddenTo   = document.getElementById('productHiddenTo').value;
   const fp = flatpickr('#productDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
@@ -150,47 +145,18 @@
     altFormat: 'M j, Y',
     onChange: function(selectedDates, dateStr, instance) {
       if (!instance.isOpen) return;
-      document.getElementById('productHiddenPeriod').value = '';
-      document.getElementById('productHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
-      document.getElementById('productHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
-      if (selectedDates.length === 2) document.getElementById('productFilterForm').submit();
+      if (selectedDates.length === 2) {
+        _setPeriod('', fp.formatDate(selectedDates[0], 'Y-m-d'), fp.formatDate(selectedDates[1], 'Y-m-d'));
+      }
     },
   });
-  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
-  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
+  const df = '{{ filters.date_from }}', dt = '{{ filters.date_to }}';
+  if (df && dt) fp.setDate([df, dt], false);
+  else if (df) fp.setDate([df], false);
 
   document.querySelectorAll('#productSortBtns .sort-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       document.getElementById('productHiddenSort').value = this.dataset.sort;
-      document.getElementById('productFilterForm').submit();
-    });
-  });
-
-  const today = new Date();
-  document.querySelectorAll('#productPeriodPresets .period-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('#productPeriodPresets .period-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      const p = this.dataset.period;
-      document.getElementById('productHiddenPeriod').value = p;
-      let df = null, dt = null;
-      if (p === 'mtd') {
-        df = new Date(today.getFullYear(), today.getMonth(), 1); dt = today;
-      } else if (p === 'qtd') {
-        const qStart = Math.floor(today.getMonth() / 3) * 3;
-        df = new Date(today.getFullYear(), qStart, 1); dt = today;
-      } else if (p === 'ytd') {
-        df = new Date(today.getFullYear(), 0, 1); dt = today;
-      }
-      if (df && dt) {
-        document.getElementById('productHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
-        document.getElementById('productHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
-        fp.setDate([df, dt], false);
-      } else {
-        fp.clear();
-        document.getElementById('productHiddenFrom').value = '';
-        document.getElementById('productHiddenTo').value   = '';
-      }
       document.getElementById('productFilterForm').submit();
     });
   });

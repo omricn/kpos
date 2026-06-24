@@ -44,9 +44,6 @@
           <i class="bi bi-calendar3 date-range-icon"></i>
           <input type="text" id="spDatePicker" class="form-control filter-input date-range-input"
                  placeholder="Select date range…" autocomplete="off" readonly>
-          <input type="hidden" name="date_from" id="spHiddenFrom" value="{{ filters.date_from }}">
-          <input type="hidden" name="date_to"   id="spHiddenTo"   value="{{ filters.date_to }}">
-          <input type="hidden" name="period"    id="spHiddenPeriod" value="{{ filters.period }}">
         </div>
       </div>
 
@@ -64,7 +61,7 @@
 
       {% if has_filters %}
       <div class="col-auto d-flex gap-2 align-items-end">
-        <a class="btn btn-outline-secondary filter-btn" href="{% url 'salesperson_list' %}?date_from=&date_to=">
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'set_period' %}?clear=1&next={% url 'salesperson_list' %}">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
       </div>
@@ -220,13 +217,8 @@ window.onThemeChange = function() {
   spChart.update('none');
 };
 
-// Flatpickr + period button highlighting
+// Flatpickr date range picker
 (function() {
-  const today = new Date();
-  const urlParams = new URLSearchParams(window.location.search);
-
-  const hiddenFrom = document.getElementById('spHiddenFrom').value;
-  const hiddenTo   = document.getElementById('spHiddenTo').value;
   const fp = flatpickr('#spDatePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
@@ -234,41 +226,14 @@ window.onThemeChange = function() {
     altFormat: 'M j, Y',
     onChange: function(selectedDates, dateStr, instance) {
       if (!instance.isOpen) return;
-      document.getElementById('spHiddenPeriod').value = '';
-      document.getElementById('spHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
-      document.getElementById('spHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
-      if (selectedDates.length === 2) document.getElementById('spFilterForm').submit();
+      if (selectedDates.length === 2) {
+        _setPeriod('', fp.formatDate(selectedDates[0], 'Y-m-d'), fp.formatDate(selectedDates[1], 'Y-m-d'));
+      }
     },
   });
-  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
-  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
-
-  function calcDates(p) {
-    if (p === 'mtd') return [new Date(today.getFullYear(), today.getMonth(), 1), today];
-    if (p === 'qtd') { const q = Math.floor(today.getMonth()/3)*3; return [new Date(today.getFullYear(), q, 1), today]; }
-    if (p === 'ytd') return [new Date(today.getFullYear(), 0, 1), today];
-    return [null, null];
-  }
-
-  document.querySelectorAll('#spPeriodPresets .period-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('#spPeriodPresets .period-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      const p = this.dataset.period;
-      document.getElementById('spHiddenPeriod').value = p;
-      const [df, dt] = calcDates(p);
-      if (df && dt) {
-        document.getElementById('spHiddenFrom').value = fp.formatDate(df, 'Y-m-d');
-        document.getElementById('spHiddenTo').value   = fp.formatDate(dt, 'Y-m-d');
-        fp.setDate([df, dt], false);
-      } else {
-        fp.clear();
-        document.getElementById('spHiddenFrom').value = '';
-        document.getElementById('spHiddenTo').value   = '';
-      }
-      document.getElementById('spFilterForm').submit();
-    });
-  });
+  const df = '{{ filters.date_from }}', dt = '{{ filters.date_to }}';
+  if (df && dt) fp.setDate([df, dt], false);
+  else if (df) fp.setDate([df], false);
 })();
 </script>
 {% endblock %}

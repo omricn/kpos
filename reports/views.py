@@ -246,6 +246,23 @@ def set_region(request):
     return redirect(request.POST.get('next', '/'))
 
 
+def set_period(request):
+    """Global period/date setter — writes shared session keys, redirects back."""
+    if request.GET.get('clear'):
+        request.session['period']    = ''
+        request.session['date_from'] = ''
+        request.session['date_to']   = ''
+    else:
+        request.session['period']    = request.GET.get('period', '')
+        request.session['date_from'] = request.GET.get('date_from', '')
+        request.session['date_to']   = request.GET.get('date_to', '')
+    request.session.modified = True
+    next_url = request.GET.get('next', '/')
+    if not next_url.startswith('/'):
+        next_url = '/'
+    return redirect(next_url)
+
+
 # ── Prior-period comparison helper ────────────────────────────────────────────
 
 def _prior_period_stats(qs_base, date_from_str, date_to_str):
@@ -375,20 +392,9 @@ def country_display(raw):
 # ── Views ──────────────────────────────────────────────────────────────────────
 
 def dashboard(request):
-    date_from_param = request.GET.get('date_from')
-    date_to_param   = request.GET.get('date_to')
-    if date_from_param is not None or date_to_param is not None:
-        date_from = (date_from_param or '').strip()
-        date_to   = (date_to_param   or '').strip()
-        period    = (request.GET.get('period') or '').strip()
-        request.session['dash_date_from'] = date_from
-        request.session['dash_date_to']   = date_to
-        request.session['dash_period']    = period
-        request.session.modified = True
-    else:
-        date_from = request.session.get('dash_date_from', '')
-        date_to   = request.session.get('dash_date_to',   '')
-        period    = request.session.get('dash_period',    '')
+    period    = request.session.get('period',    '')
+    date_from = request.session.get('date_from', '')
+    date_to   = request.session.get('date_to',   '')
     distributor_id = request.GET.get('distributor', '')
 
     # Region: explicit URL param updates session; navigation falls back to session
@@ -843,20 +849,9 @@ def distributor_list(request):
         request.session.modified = True
     else:
         selected_region = request.session.get('region', '')
-    date_from_param = request.GET.get('date_from')
-    date_to_param   = request.GET.get('date_to')
-    if date_from_param is not None or date_to_param is not None:
-        date_from = (date_from_param or '').strip()
-        date_to   = (date_to_param   or '').strip()
-        period    = (request.GET.get('period') or '').strip()
-        request.session['dist_date_from'] = date_from
-        request.session['dist_date_to']   = date_to
-        request.session['dist_period']    = period
-        request.session.modified = True
-    else:
-        date_from = request.session.get('dist_date_from', '')
-        date_to   = request.session.get('dist_date_to',   '')
-        period    = request.session.get('dist_period',    '')
+    period    = request.session.get('period',    '')
+    date_from = request.session.get('date_from', '')
+    date_to   = request.session.get('date_to',   '')
     selected_sp = request.GET.get('salesperson', '').strip()
 
     selected_currency = request.session.get('currency', 'USD')
@@ -996,20 +991,9 @@ def distributor_list(request):
 
 
 def product_list(request):
-    date_from_param = request.GET.get('date_from')
-    date_to_param   = request.GET.get('date_to')
-    if date_from_param is not None or date_to_param is not None:
-        date_from = (date_from_param or '').strip()
-        date_to   = (date_to_param   or '').strip()
-        period    = (request.GET.get('period') or '').strip()
-        request.session['prod_date_from'] = date_from
-        request.session['prod_date_to']   = date_to
-        request.session['prod_period']    = period
-        request.session.modified = True
-    else:
-        date_from = request.session.get('prod_date_from', '')
-        date_to   = request.session.get('prod_date_to',   '')
-        period    = request.session.get('prod_period',    '')
+    period    = request.session.get('period',    '')
+    date_from = request.session.get('date_from', '')
+    date_to   = request.session.get('date_to',   '')
     search    = request.GET.get('q', '').strip()
     sort_by   = request.GET.get('sort', 'revenue')
     if sort_by not in ('revenue', 'units'):
@@ -1440,21 +1424,9 @@ def salesperson_list(request):
     else:
         region = request.session.get('region', '')
 
-    # Period/dates: same sticky pattern as region
-    date_from_param = request.GET.get('date_from')
-    date_to_param   = request.GET.get('date_to')
-    if date_from_param is not None or date_to_param is not None:
-        date_from = (date_from_param or '').strip()
-        date_to   = (date_to_param   or '').strip()
-        period    = (request.GET.get('period') or '').strip()
-        request.session['sp_date_from'] = date_from
-        request.session['sp_date_to']   = date_to
-        request.session['sp_period']    = period
-        request.session.modified = True
-    else:
-        date_from = request.session.get('sp_date_from', '')
-        date_to   = request.session.get('sp_date_to',   '')
-        period    = request.session.get('sp_period',    '')
+    period    = request.session.get('period',    '')
+    date_from = request.session.get('date_from', '')
+    date_to   = request.session.get('date_to',   '')
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)

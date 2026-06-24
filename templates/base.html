@@ -388,5 +388,42 @@ var KPOS_AI_USER = '{{ user.first_name|default:user.username }}';
 })();
 </script>
 {% block extra_js %}{% endblock %}
+<script>
+// Global period selector — works on all pages
+(function() {
+  function _fmtDate(d) {
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0');
+  }
+  window._setPeriod = function(period, dateFrom, dateTo) {
+    var next = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = '/set-period/?period=' + encodeURIComponent(period) +
+      '&date_from=' + encodeURIComponent(dateFrom || '') +
+      '&date_to='   + encodeURIComponent(dateTo   || '') +
+      '&next=' + next;
+  };
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.period-btn[data-period]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var p = this.dataset.period;
+        var t = new Date(), df = '', dt = '';
+        if (p === 'mtd') {
+          df = _fmtDate(new Date(t.getFullYear(), t.getMonth(), 1));
+          dt = _fmtDate(t);
+        } else if (p === 'qtd') {
+          var q = Math.floor(t.getMonth()/3)*3;
+          df = _fmtDate(new Date(t.getFullYear(), q, 1));
+          dt = _fmtDate(t);
+        } else if (p === 'ytd') {
+          df = _fmtDate(new Date(t.getFullYear(), 0, 1));
+          dt = _fmtDate(t);
+        }
+        _setPeriod(p, df, dt);
+      });
+    });
+  });
+})();
+</script>
 </body>
 </html>

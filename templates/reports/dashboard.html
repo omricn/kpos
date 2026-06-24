@@ -120,9 +120,6 @@
           <i class="bi bi-calendar3 date-range-icon"></i>
           <input type="text" id="dateRangePicker" class="form-control filter-input date-range-input"
                  placeholder="Select date range…" autocomplete="off" readonly>
-          <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ filters.date_from }}">
-          <input type="hidden" name="date_to"   id="hiddenDateTo"   value="{{ filters.date_to }}">
-          <input type="hidden" name="period"    id="hiddenPeriod"   value="{{ filters.period }}">
         </div>
       </div>
 
@@ -140,7 +137,7 @@
 
       {% if has_filters %}
       <div class="col-auto d-flex gap-2 align-items-end">
-        <a class="btn btn-outline-secondary filter-btn" href="{% url 'dashboard' %}">
+        <a class="btn btn-outline-secondary filter-btn" href="{% url 'set_period' %}?clear=1&next=/">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
       </div>
@@ -266,8 +263,6 @@
 <script>
 // Flatpickr date range picker
 (function() {
-  const hiddenFrom = document.getElementById('hiddenDateFrom').value;
-  const hiddenTo   = document.getElementById('hiddenDateTo').value;
   const fp = flatpickr('#dateRangePicker', {
     mode: 'range',
     dateFormat: 'Y-m-d',
@@ -275,46 +270,14 @@
     altFormat: 'M j, Y',
     onChange: function(selectedDates, dateStr, instance) {
       if (!instance.isOpen) return;
-      document.getElementById('hiddenPeriod').value    = '';
-      document.getElementById('hiddenDateFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
-      document.getElementById('hiddenDateTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
-      if (selectedDates.length === 2) document.getElementById('filterForm').submit();
+      if (selectedDates.length === 2) {
+        _setPeriod('', fp.formatDate(selectedDates[0], 'Y-m-d'), fp.formatDate(selectedDates[1], 'Y-m-d'));
+      }
     },
   });
-  if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
-  else if (hiddenFrom) fp.setDate([hiddenFrom], false);
-
-  const today = new Date();
-  document.querySelectorAll('#periodPresets .period-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('#periodPresets .period-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      const p = this.dataset.period;
-      document.getElementById('hiddenPeriod').value = p;
-      let df = null, dt = null;
-      if (p === 'mtd') {
-        df = new Date(today.getFullYear(), today.getMonth(), 1);
-        dt = today;
-      } else if (p === 'qtd') {
-        const qStart = Math.floor(today.getMonth() / 3) * 3;
-        df = new Date(today.getFullYear(), qStart, 1);
-        dt = today;
-      } else if (p === 'ytd') {
-        df = new Date(today.getFullYear(), 0, 1);
-        dt = today;
-      }
-      if (df && dt) {
-        document.getElementById('hiddenDateFrom').value = fp.formatDate(df, 'Y-m-d');
-        document.getElementById('hiddenDateTo').value   = fp.formatDate(dt, 'Y-m-d');
-        fp.setDate([df, dt], false);
-      } else {
-        fp.clear();
-        document.getElementById('hiddenDateFrom').value = '';
-        document.getElementById('hiddenDateTo').value   = '';
-      }
-      document.getElementById('filterForm').submit();
-    });
-  });
+  const df = '{{ filters.date_from }}', dt = '{{ filters.date_to }}';
+  if (df && dt) fp.setDate([df, dt], false);
+  else if (df) fp.setDate([df], false);
 })();
 </script>
 <script>
