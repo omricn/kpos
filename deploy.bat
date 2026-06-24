@@ -4,7 +4,7 @@ set REGISTRY=kdeskregistry.azurecr.io
 set RG=KPOS
 set APP=kpos
 
-for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd-HHmm'"') do set SUFFIX=r%%i
+for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMddHHmmss'"') do set SUFFIX=r%%i
 
 echo =^> Revision suffix: %SUFFIX%
 
