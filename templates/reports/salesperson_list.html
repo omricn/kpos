@@ -28,12 +28,12 @@
 
       <!-- Period presets -->
       <div class="col-12 col-xl-auto">
-        <label class="filter-label">Period <small class="text-muted" style="font-size:10px">[s:{{ filters.period|default:'—' }}]</small></label>
+        <label class="filter-label">Period</label>
         <div class="btn-group btn-group-sm" id="spPeriodPresets">
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="mtd">MTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="qtd">QTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="ytd">YTD</button>
-          <button type="button" class="btn btn-outline-secondary period-btn" data-period="all">All</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'mtd' %} active{% endif %}" data-period="mtd">MTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'qtd' %} active{% endif %}" data-period="qtd">QTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'ytd' %} active{% endif %}" data-period="ytd">YTD</button>
+          <button type="button" class="btn btn-outline-secondary period-btn{% if filters.period == 'all' or not filters.period and not filters.date_from and not filters.date_to %} active{% endif %}" data-period="all">All</button>
         </div>
       </div>
 
@@ -241,13 +241,6 @@ window.onThemeChange = function() {
   });
   if (hiddenFrom && hiddenTo) fp.setDate([hiddenFrom, hiddenTo], false);
   else if (hiddenFrom) fp.setDate([hiddenFrom], false);
-
-  // Highlight active period button — use server-side value (works even when dates come from session)
-  const activePeriod = '{{ filters.period }}' || (!hiddenFrom && !hiddenTo ? 'all' : null);
-  if (activePeriod) {
-    const activeBtn = document.querySelector('#spPeriodPresets .period-btn[data-period="' + activePeriod + '"]');
-    if (activeBtn) activeBtn.classList.add('active');
-  }
 
   function calcDates(p) {
     if (p === 'mtd') return [new Date(today.getFullYear(), today.getMonth(), 1), today];
