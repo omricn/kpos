@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.cache import cache
 from django.db.models import Sum, Count, Min, Max, Q, Case, When, F, DecimalField, ExpressionWrapper, Value, Subquery, OuterRef, CharField, Exists
-from django.db.models.functions import TruncMonth, TruncWeek, ExtractYear, ExtractMonth
+from django.db.models.functions import TruncMonth, TruncWeek, TruncDay, ExtractYear, ExtractMonth
 from django.db.models.functions import Coalesce
 from django.conf import settings as django_settings
 from django.http import HttpResponse, JsonResponse
@@ -443,25 +443,39 @@ def dashboard(request):
             first_of_month = today.replace(day=1)
             prior_label = 'vs ' + (first_of_month - timedelta(days=1)).strftime('%b %Y')
 
+        # Use daily granularity for short date ranges (≤90 days), monthly otherwise
+        use_daily = False
+        if date_from and date_to:
+            try:
+                _df = dt_class.strptime(date_from, '%Y-%m-%d').date()
+                _dt = dt_class.strptime(date_to, '%Y-%m-%d').date()
+                use_daily = (_dt - _df).days <= 90
+            except ValueError:
+                pass
+
+        _trunc_fn = TruncDay if use_daily else TruncMonth
+        _key_fmt  = '%Y-%m-%d' if use_daily else '%Y-%m'
+        _lbl_fmt  = '%b %d' if use_daily else '%b %Y'
+
         monthly_qs = list(
             _annotate_converted(
                 qs.filter(invoice_date__isnull=False, invoiced_value__isnull=False),
                 selected_currency, rates
             )
-            .annotate(month=TruncMonth('invoice_date'))
+            .annotate(month=_trunc_fn('invoice_date'))
             .values('month', 'distributor__region')
             .annotate(revenue=Sum('converted_value'))
             .order_by('month', 'distributor__region')
         )
         months_sorted = sorted(set(r['month'] for r in monthly_qs))
-        month_labels  = [m.strftime('%b %Y') for m in months_sorted]
-        month_keys    = [m.strftime('%Y-%m') for m in months_sorted]
+        month_labels  = [m.strftime(_lbl_fmt) for m in months_sorted]
+        month_keys    = [m.strftime(_key_fmt)  for m in months_sorted]
         region_order  = {}
         for r in monthly_qs:
             reg = r['distributor__region'] or 'Unknown'
             if reg not in region_order:
                 region_order[reg] = {'by_month': {}}
-            region_order[reg]['by_month'][r['month'].strftime('%Y-%m')] = float(r['revenue'])
+            region_order[reg]['by_month'][r['month'].strftime(_key_fmt)] = float(r['revenue'])
         datasets = []
         for reg, info in region_order.items():
             color = REGION_COLORS.get(reg, '#6c757d')
