@@ -151,6 +151,9 @@
     onChange: function(selectedDates) {
       document.getElementById('productHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('productHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    },
+    onClose: function(selectedDates) {
+      if (selectedDates.length === 2) document.getElementById('productFilterForm').submit();
     }
   });
   if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);

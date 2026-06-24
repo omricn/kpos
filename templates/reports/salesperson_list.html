@@ -53,7 +53,8 @@
       <!-- Sales Rep -->
       <div class="col-auto">
         <label class="filter-label">Sales Rep</label>
-        <select class="form-select filter-input" name="salesperson" style="min-width:180px">
+        <select class="form-select filter-input" name="salesperson" style="min-width:180px"
+                onchange="document.getElementById('spFilterForm').submit()">
           <option value="">All Sales Reps</option>
           {% for sp in all_salespersons %}
           <option value="{{ sp }}" {% if selected_sp == sp %}selected{% endif %}>{{ sp }}</option>
@@ -61,17 +62,13 @@
         </select>
       </div>
 
-      <!-- Apply / Clear -->
+      {% if has_filters %}
       <div class="col-auto d-flex gap-2 align-items-end">
-        <button class="btn btn-kramer filter-btn px-4" type="submit">
-          <i class="bi bi-funnel-fill me-1"></i>Apply
-        </button>
-        {% if has_filters %}
         <a class="btn btn-outline-secondary filter-btn" href="{% url 'salesperson_list' %}?date_from=&date_to=">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
-        {% endif %}
       </div>
+      {% endif %}
 
     </form>
   </div>
@@ -238,6 +235,9 @@ window.onThemeChange = function() {
     onChange: function(selectedDates) {
       document.getElementById('spHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('spHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    },
+    onClose: function(selectedDates) {
+      if (selectedDates.length === 2) document.getElementById('spFilterForm').submit();
     }
   });
   if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);

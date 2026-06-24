@@ -129,7 +129,8 @@
       <!-- Distributor -->
       <div class="col-6 col-xl-auto">
         <label class="filter-label">Distributor</label>
-        <select class="form-select filter-input" name="distributor" style="min-width:200px">
+        <select class="form-select filter-input" name="distributor" style="min-width:200px"
+                onchange="document.getElementById('filterForm').submit()">
           <option value="">All Distributors</option>
           {% for d in all_distributors %}
           <option value="{{ d.pk }}" {% if filters.distributor == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
@@ -137,17 +138,13 @@
         </select>
       </div>
 
-      <!-- Actions -->
+      {% if has_filters %}
       <div class="col-auto d-flex gap-2 align-items-end">
-        <button class="btn btn-kramer filter-btn px-4" type="submit">
-          <i class="bi bi-funnel-fill me-1"></i>Apply
-        </button>
-        {% if has_filters %}
         <a class="btn btn-outline-secondary filter-btn" href="{% url 'dashboard' %}">
           <i class="bi bi-x-lg me-1"></i>Clear
         </a>
-        {% endif %}
       </div>
+      {% endif %}
 
     </form>
   </div>
@@ -279,6 +276,9 @@
     onChange: function(selectedDates) {
       document.getElementById('hiddenDateFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('hiddenDateTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
+    },
+    onClose: function(selectedDates) {
+      if (selectedDates.length === 2) document.getElementById('filterForm').submit();
     }
   });
   if (hiddenFrom) fp.setDate([hiddenFrom, hiddenTo || hiddenFrom]);

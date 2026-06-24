@@ -1535,6 +1535,21 @@ def customer_reps(request):
     })
 
 
+def customer_autocomplete(request):
+    """AJAX GET: return customer names matching ?q= for autocomplete."""
+    q = request.GET.get('q', '').strip()
+    if len(q) < 2:
+        return JsonResponse([], safe=False)
+    names = list(
+        POSRecord.objects.filter(customer_name__icontains=q)
+        .exclude(customer_name='')
+        .values_list('customer_name', flat=True)
+        .distinct()
+        .order_by('customer_name')[:20]
+    )
+    return JsonResponse(names, safe=False)
+
+
 def set_record_rep(request):
     """AJAX POST: set or clear the per-invoice salesperson override on a POSRecord."""
     if request.method != 'POST':

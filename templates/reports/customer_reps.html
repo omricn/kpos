@@ -19,8 +19,11 @@
 <!-- Search -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body py-3 px-4">
-    <form class="d-flex gap-2" method="get">
-      <input type="text" name="q" class="form-control" placeholder="Search customer name…" value="{{ search }}" style="max-width:340px">
+    <form class="d-flex gap-2" method="get" id="crSearchForm">
+      <div style="position:relative;max-width:340px;flex:1">
+        <input type="text" name="q" id="crSearchInput" class="form-control" placeholder="Search customer name…" value="{{ search }}" autocomplete="off">
+        <ul id="crAutocomplete" class="list-unstyled shadow-sm border rounded bg-white position-absolute w-100 mb-0" style="top:100%;left:0;z-index:999;max-height:220px;overflow-y:auto;display:none"></ul>
+      </div>
       <button class="btn btn-kramer px-4" type="submit">
         <i class="bi bi-search me-1"></i>Search
       </button>
@@ -154,5 +157,43 @@ document.querySelectorAll('.assign-btn').forEach(btn => {
     document.getElementById('modalCustomerName').value = name;
   });
 });
+
+// Customer name autocomplete
+(function() {
+  const input = document.getElementById('crSearchInput');
+  const list  = document.getElementById('crAutocomplete');
+  let timer;
+
+  function hide() { list.style.display = 'none'; list.innerHTML = ''; }
+
+  input.addEventListener('input', function() {
+    clearTimeout(timer);
+    const q = this.value.trim();
+    if (q.length < 2) { hide(); return; }
+    timer = setTimeout(async function() {
+      const res = await fetch('/api/customer-autocomplete/?q=' + encodeURIComponent(q));
+      const names = await res.json();
+      if (!names.length) { hide(); return; }
+      list.innerHTML = names.map(n =>
+        `<li class="px-3 py-2" style="cursor:pointer;font-size:.9rem" onmousedown="event.preventDefault()">${n.replace(/</g,'&lt;')}</li>`
+      ).join('');
+      list.querySelectorAll('li').forEach(li => {
+        li.addEventListener('mousedown', function() {
+          input.value = this.textContent;
+          hide();
+          document.getElementById('crSearchForm').submit();
+        });
+        li.addEventListener('mouseover', function() { this.style.background = '#f3e5fa'; });
+        li.addEventListener('mouseout',  function() { this.style.background = ''; });
+      });
+      list.style.display = 'block';
+    }, 200);
+  });
+
+  input.addEventListener('blur', hide);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') hide();
+  });
+})();
 </script>
 {% endblock %}
