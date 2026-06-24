@@ -64,7 +64,7 @@
                  placeholder="Select date range…" autocomplete="off" readonly>
           <input type="hidden" name="date_from" id="distHiddenFrom" value="{{ filters.date_from }}">
           <input type="hidden" name="date_to"   id="distHiddenTo"   value="{{ filters.date_to }}">
-          <input type="hidden" name="period"    id="distHiddenPeriod" value="">
+          <input type="hidden" name="period"    id="distHiddenPeriod" value="{{ filters.period }}">
         </div>
       </div>
 
@@ -263,6 +263,7 @@ document.getElementById('distJump').addEventListener('change', function() {
     altFormat: 'M j, Y',
     onChange: function(selectedDates, dateStr, instance) {
       if (!instance.isOpen) return;
+      document.getElementById('distHiddenPeriod').value = '';
       document.getElementById('distHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('distHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
       if (selectedDates.length === 2) document.getElementById('distFilterForm').submit();

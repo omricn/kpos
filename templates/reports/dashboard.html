@@ -122,7 +122,7 @@
                  placeholder="Select date range…" autocomplete="off" readonly>
           <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ filters.date_from }}">
           <input type="hidden" name="date_to"   id="hiddenDateTo"   value="{{ filters.date_to }}">
-          <input type="hidden" name="period"    id="hiddenPeriod"   value="">
+          <input type="hidden" name="period"    id="hiddenPeriod"   value="{{ filters.period }}">
         </div>
       </div>
 
@@ -275,6 +275,7 @@
     altFormat: 'M j, Y',
     onChange: function(selectedDates, dateStr, instance) {
       if (!instance.isOpen) return;
+      document.getElementById('hiddenPeriod').value    = '';
       document.getElementById('hiddenDateFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('hiddenDateTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
       if (selectedDates.length === 2) document.getElementById('filterForm').submit();

@@ -46,7 +46,7 @@
                  placeholder="Select date range…" autocomplete="off" readonly>
           <input type="hidden" name="date_from" id="spHiddenFrom" value="{{ filters.date_from }}">
           <input type="hidden" name="date_to"   id="spHiddenTo"   value="{{ filters.date_to }}">
-          <input type="hidden" name="period"    id="spHiddenPeriod" value="">
+          <input type="hidden" name="period"    id="spHiddenPeriod" value="{{ filters.period }}">
         </div>
       </div>
 
@@ -233,7 +233,8 @@ window.onThemeChange = function() {
     altInput: true,
     altFormat: 'M j, Y',
     onChange: function(selectedDates, dateStr, instance) {
-      if (!instance.isOpen) return;  // skip programmatic setDate calls
+      if (!instance.isOpen) return;
+      document.getElementById('spHiddenPeriod').value = '';
       document.getElementById('spHiddenFrom').value = selectedDates[0] ? fp.formatDate(selectedDates[0], 'Y-m-d') : '';
       document.getElementById('spHiddenTo').value   = selectedDates[1] ? fp.formatDate(selectedDates[1], 'Y-m-d') : '';
       if (selectedDates.length === 2) document.getElementById('spFilterForm').submit();
