@@ -12,6 +12,7 @@ from django.db.models.functions import TruncMonth, TruncWeek, ExtractYear, Extra
 from django.db.models.functions import Coalesce
 from django.conf import settings as django_settings
 from django.http import HttpResponse, JsonResponse
+from django.core.paginator import Paginator
 from django.utils import timezone
 
 from .models import Distributor, POSUpload, POSRecord, ExchangeRate, MonthlyRate, PriorityProduct, PrioritySalesperson, CustomerSalesRep
@@ -637,7 +638,12 @@ def distributor_records(request, pk):
 
     # Annotate each record with its effective rep (override > customer assignment > distributor)
     eff_name, eff_code = _effective_rep_annotations()
-    records = records.annotate(eff_rep_name=eff_name)
+    records = records.annotate(eff_rep_name=eff_name).order_by('-invoice_date', 'pk')
+
+    # Paginate — 100 rows per page keeps the correlated subquery manageable
+    paginator = Paginator(records, 100)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
 
     # Filter options
     categories = POSRecord.objects.filter(distributor=distributor).values_list(
@@ -647,7 +653,9 @@ def distributor_records(request, pk):
 
     context = {
         'distributor': distributor,
-        'records': records,
+        'records': page_obj,
+        'page_obj': page_obj,
+        'paginator': paginator,
         'stats': stats,
         'categories': categories,
         'uploads': uploads,
