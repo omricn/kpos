@@ -62,6 +62,12 @@
             <i class="bi bi-box-seam me-1"></i>Products
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'rebates' %}active{% endif %}"
+             href="{% url 'rebates' %}">
+            <i class="bi bi-percent me-1"></i>Rebates
+          </a>
+        </li>
       </ul>
       <div class="d-flex align-items-center gap-3">
         <form method="post" action="{% url 'set_region' %}" class="d-inline me-2">

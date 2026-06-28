@@ -7,7 +7,7 @@
   "auth": {
     "type": "basic",
     "basic": [
-      { "key": "username", "value": "2B643D1E29D644BFAF00760B5336F405", "type": "string" },
+      { "key": "username", "value": "REPLACE_WITH_PRIORITY_TOKEN", "type": "string" },
       { "key": "password", "value": "PAT", "type": "string" }
     ]
   },

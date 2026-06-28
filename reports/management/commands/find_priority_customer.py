@@ -12,13 +12,17 @@ to set on each KPos Distributor in Django admin.
 """
 import base64
 import json
+import os
 import urllib.request
 from urllib.parse import quote
 
 from django.core.management.base import BaseCommand
 
 PRIORITY_BASE = 'https://api22.kramerav.com/odata/Priority/tabula.ini/krmel/'
-PRIORITY_AUTH = base64.b64encode(b'2B643D1E29D644BFAF00760B5336F405:PAT').decode()
+# Priority ERP token — supplied via the PRIORITY_API_TOKEN env var (format: "<TOKEN>:PAT").
+# Placeholder default keeps real credentials out of source control.
+PRIORITY_TOKEN = os.environ.get('PRIORITY_API_TOKEN', 'REPLACE_WITH_PRIORITY_TOKEN:PAT')
+PRIORITY_AUTH = base64.b64encode(PRIORITY_TOKEN.encode()).decode()
 PAGE_SIZE = 2000
 
 

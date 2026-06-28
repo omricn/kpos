@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <a href="{% url 'dashboard' %}" class="text-decoration-none text-muted small">
+      <i class="bi bi-chevron-left me-1"></i>Dashboard
+    </a>
+    <h4 class="mb-1 fw-bold mt-1">VIR Rebates</h4>
+    <p class="text-muted small mb-0">Volume Incentive Rebate — attainment vs. threshold per distributor</p>
+  </div>
+</div>
+
+<!-- Period selector -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3 px-4">
+    <form class="row g-3 align-items-end" method="get">
+
+      <div class="col-auto">
+        <label class="filter-label">Year</label>
+        <select class="form-select filter-input" name="year" onchange="this.form.submit()">
+          {% for yr in available_years %}
+          <option value="{{ yr }}" {% if yr == year %}selected{% endif %}>{{ yr }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-auto">
+        <label class="filter-label">Quarter</label>
+        <div class="btn-group btn-group-sm">
+          {% for q in "1234" %}
+          <button type="submit" name="quarter" value="{{ q }}"
+            class="btn {% if quarter == q|add:0 %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+            style="min-width:40px">
+            Q{{ q }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- Summary KPI cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Agreements Active</p>
+        <h4 class="fw-bold mb-0">{{ total_agreements }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Earned Q ({{ q_label }})</p>
+        <h4 class="fw-bold mb-0">{{ earned_count }}</h4>
+        <p class="text-muted small mb-0">of {{ total_agreements }} met threshold</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Total Rebate {{ q_label }}</p>
+        <h4 class="fw-bold mb-0 text-success">${{ total_q_rebate|floatformat:0|intcomma }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Total Rebate {{ yr_label }} YTD</p>
+        <h4 class="fw-bold mb-0 text-success">${{ total_yr_rebate|floatformat:0|intcomma }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Rebate table -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent py-3 px-4 d-flex align-items-center justify-content-between">
+    <h6 class="mb-0 fw-semibold">Rebate Attainment — {{ q_label }}</h6>
+    <small class="text-muted">Revenue from POS sell-through data (USD)</small>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Distributor</th>
+            <th>Classification</th>
+            <th>VIR %</th>
+            <th class="text-end">Threshold Q</th>
+            <th class="text-end">Revenue {{ q_label }}</th>
+            <th style="min-width:120px">Attainment Q</th>
+            <th class="text-end">Rebate {{ q_label }}</th>
+            <th class="text-end">Revenue {{ yr_label }}</th>
+            <th class="text-end">Rebate {{ yr_label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td class="ps-4 fw-medium">
+              {% if r.agreement.distributor %}
+              <a href="{% url 'distributor_records' r.agreement.distributor.pk %}" class="text-decoration-none">
+                {{ r.agreement.customer_name }}
+              </a>
+              {% else %}
+              <span class="text-muted">{{ r.agreement.customer_name }}</span>
+              {% if not r.has_pos %}<span class="badge bg-secondary ms-1" style="font-size:.65rem">no POS</span>{% endif %}
+              {% endif %}
+            </td>
+            <td>
+              {% if r.agreement.classification %}
+              <span class="badge"
+                style="background:{% if r.agreement.classification == 'Platinum' %}#E5B900{% elif r.agreement.classification == 'Special' %}#8205B4{% else %}#6c757d{% endif %}">
+                {{ r.agreement.classification }}
+              </span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="fw-semibold">{{ r.pct_display }}</td>
+            <td class="text-end">${{ r.thr_q|floatformat:0|intcomma }}</td>
+            <td class="text-end">${{ r.q_rev|floatformat:0|intcomma }}</td>
+            <td>
+              {% if r.has_pos %}
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:8px">
+                  <div class="progress-bar {% if r.q_earned %}bg-success{% elif r.q_attain >= 75 %}bg-warning{% else %}bg-danger{% endif %}"
+                    style="width:{{ r.q_attain|floatformat:0 }}%; max-width:100%"></div>
+                </div>
+                <small class="{% if r.q_earned %}text-success fw-semibold{% else %}text-muted{% endif %}" style="min-width:42px">
+                  {{ r.q_attain }}%
+                </small>
+              </div>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if r.q_earned %}
+              <span class="fw-semibold text-success">${{ r.q_rebate|floatformat:0|intcomma }}</span>
+              {% else %}
+              <span class="text-muted">$0</span>
+              {% endif %}
+            </td>
+            <td class="text-end">${{ r.yr_rev|floatformat:0|intcomma }}</td>
+            <td class="text-end">
+              {% if r.yr_earned %}
+              <span class="fw-semibold text-success">${{ r.yr_rebate|floatformat:0|intcomma }}</span>
+              {% else %}
+              <span class="text-muted">$0</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center py-5 text-muted">No active rebate agreements found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<p class="text-muted small mt-3">
+  <i class="bi bi-info-circle me-1"></i>
+  Revenue is sourced from POS sell-through reports uploaded to KPOS, converted to USD.
+  Agreements without a linked POS distributor show $0 until reports are uploaded.
+</p>
+
+{% endblock %}

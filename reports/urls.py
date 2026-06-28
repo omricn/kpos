@@ -20,6 +20,7 @@ urlpatterns = [
     path('customer-reps/', views.customer_reps, name='customer_reps'),
     path('api/record-rep/', views.set_record_rep, name='set_record_rep'),
     path('api/customer-autocomplete/', views.customer_autocomplete, name='customer_autocomplete'),
+    path('rebates/', views.rebates_view, name='rebates'),
     path('ai-chat/', views.ai_chat, name='ai_chat'),
     path('ai-export/', views.ai_export, name='ai_export'),
     path('ai-clear/', views.ai_clear, name='ai_clear'),

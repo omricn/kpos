@@ -15,7 +15,7 @@ from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
 from django.utils import timezone
 
-from .models import Distributor, POSUpload, POSRecord, ExchangeRate, MonthlyRate, PriorityProduct, PrioritySalesperson, CustomerSalesRep
+from .models import Distributor, POSUpload, POSRecord, ExchangeRate, MonthlyRate, PriorityProduct, PrioritySalesperson, CustomerSalesRep, RebateAgreement
 from .forms import UploadForm
 from .parsers import get_parser
 
@@ -2154,6 +2154,115 @@ def ai_history(request):
             elif role == 'assistant':
                 visible.append({'role': 'bot', 'text': content})
     return JsonResponse({'history': visible})
+
+
+def rebates_view(request):
+    today = date_cls.today()
+    current_year = today.year
+    current_q = (today.month - 1) // 3 + 1
+
+    try:
+        year = int(request.GET.get('year', current_year))
+    except (TypeError, ValueError):
+        year = current_year
+    try:
+        quarter = int(request.GET.get('quarter', current_q))
+    except (TypeError, ValueError):
+        quarter = current_q
+    if quarter not in (1, 2, 3, 4):
+        quarter = current_q
+
+    q_months = {1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12]}
+
+    agreements = list(
+        RebateAgreement.objects
+        .filter(active=True)
+        .select_related('distributor', 'priority_customer')
+        .order_by('customer_name')
+    )
+
+    dist_ids = [a.distributor_id for a in agreements if a.distributor_id]
+
+    q_rev_map = {}
+    yr_rev_map = {}
+    if dist_ids:
+        for row in (
+            POSRecord.objects
+            .filter(distributor_id__in=dist_ids, invoice_date__year=year,
+                    invoice_date__month__in=q_months[quarter], invoiced_value__isnull=False)
+            .values('distributor_id')
+            .annotate(rev=_usd_sum_expr())
+        ):
+            q_rev_map[row['distributor_id']] = float(row['rev'] or 0)
+
+        for row in (
+            POSRecord.objects
+            .filter(distributor_id__in=dist_ids, invoice_date__year=year,
+                    invoiced_value__isnull=False)
+            .values('distributor_id')
+            .annotate(rev=_usd_sum_expr())
+        ):
+            yr_rev_map[row['distributor_id']] = float(row['rev'] or 0)
+
+    results = []
+    for agr in agreements:
+        dist_id = agr.distributor_id
+        q_rev  = q_rev_map.get(dist_id, 0) if dist_id else 0
+        yr_rev = yr_rev_map.get(dist_id, 0) if dist_id else 0
+
+        thr_q  = float(agr.threshold_quarterly)
+        thr_yr = float(agr.threshold_yearly)
+        pct    = float(agr.rebate_pct)
+
+        q_attain  = round(q_rev  / thr_q  * 100, 1) if thr_q  else 0
+        yr_attain = round(yr_rev / thr_yr * 100, 1) if thr_yr else 0
+
+        q_rebate  = q_rev  * pct if q_rev  >= thr_q  and thr_q  else 0
+        yr_rebate = yr_rev * pct if yr_rev >= thr_yr and thr_yr else 0
+
+        results.append({
+            'agreement':  agr,
+            'q_rev':      q_rev,
+            'yr_rev':     yr_rev,
+            'thr_q':      thr_q,
+            'thr_yr':     thr_yr,
+            'pct':        pct,
+            'pct_display': f"{pct*100:.1f}%",
+            'q_attain':   q_attain,
+            'yr_attain':  yr_attain,
+            'q_rebate':   q_rebate,
+            'yr_rebate':  yr_rebate,
+            'q_earned':   q_rev  >= thr_q  and thr_q  > 0,
+            'yr_earned':  yr_rev >= thr_yr and thr_yr > 0,
+            'has_pos':    dist_id is not None,
+        })
+
+    results.sort(key=lambda x: -x['q_rev'])
+
+    total_q_rebate  = sum(r['q_rebate']  for r in results)
+    total_yr_rebate = sum(r['yr_rebate'] for r in results)
+    earned_count    = sum(1 for r in results if r['q_earned'])
+
+    available_years = sorted(
+        POSRecord.objects.filter(invoice_date__isnull=False)
+        .values_list('invoice_date__year', flat=True)
+        .distinct(),
+        reverse=True,
+    ) or [current_year]
+
+    return render(request, 'reports/rebates.html', {
+        'results':          results,
+        'year':             year,
+        'quarter':          quarter,
+        'q_label':          f"Q{quarter} {year}",
+        'yr_label':         str(year),
+        'total_q_rebate':   total_q_rebate,
+        'total_yr_rebate':  total_yr_rebate,
+        'earned_count':     earned_count,
+        'total_agreements': len(results),
+        'available_years':  available_years,
+        'page_title':       'VIR Rebates',
+    })
 
 
 def ai_export(request):

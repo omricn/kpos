@@ -180,6 +180,53 @@ class CustomerSalesRep(models.Model):
         return f"{self.customer_name} → {self.salesperson.agent_name} (from {self.effective_from})"
 
 
+class RebateAgreement(models.Model):
+    """Rebate (VIR) agreement for a distributor or customer."""
+    PERIOD_QUARTERLY = 'quarterly'
+    PERIOD_YEARLY    = 'yearly'
+    PERIOD_CHOICES   = [(PERIOD_QUARTERLY, 'Quarterly'), (PERIOD_YEARLY, 'Yearly')]
+
+    # Identity — at least one of distributor / priority_customer should be set
+    distributor       = models.ForeignKey(
+        Distributor, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='rebate_agreements',
+    )
+    priority_customer = models.ForeignKey(
+        PriorityCustomer, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='rebate_agreements',
+    )
+    customer_name     = models.CharField(max_length=200)   # from source file, always populated
+
+    # Agreement terms
+    country              = models.CharField(max_length=100, blank=True)
+    country_for_accrual  = models.CharField(max_length=100, blank=True)
+    classification       = models.CharField(max_length=100, blank=True)
+    currency             = models.CharField(max_length=10, default='USD')
+    threshold_quarterly  = models.DecimalField(max_digits=14, decimal_places=2)
+    threshold_yearly     = models.DecimalField(max_digits=14, decimal_places=2)
+    rebate_pct           = models.DecimalField(max_digits=6, decimal_places=4)  # 0.03 = 3%
+
+    # Validity
+    effective_from = models.DateField()
+    effective_to   = models.DateField(null=True, blank=True)
+    active         = models.BooleanField(default=True)
+
+    # Provenance
+    source_file    = models.CharField(max_length=255, blank=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['customer_name']
+
+    def __str__(self):
+        return f"{self.customer_name} — {self.rebate_pct*100:.1f}% VIR ({self.classification})"
+
+    @property
+    def rebate_pct_display(self):
+        return f"{float(self.rebate_pct)*100:.1f}%"
+
+
 class PriorityProduct(models.Model):
     """Cached copy of Priority LOGPART — Kramer product catalog."""
     part_number = models.CharField(max_length=100, unique=True)
