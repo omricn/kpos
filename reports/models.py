@@ -9,10 +9,19 @@ class Distributor(models.Model):
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Priority ERP link (set manually in admin, synced by sync_priority command)
+    # Priority ERP link — set manually in admin or auto-matched from PriorityCustomer
     priority_customer_code = models.CharField(
         max_length=50, blank=True,
-        help_text='Priority CUSTNAME code for this distributor (e.g. CDEV)',
+        help_text='Priority CUSTNAME code for this distributor (e.g. C105190)',
+    )
+    priority_company = models.CharField(
+        max_length=50, blank=True,
+        help_text='Priority company entity this customer belongs to (e.g. kusa21, sngpr)',
+    )
+    priority_customer = models.ForeignKey(
+        'PriorityCustomer', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='distributors',
+        help_text='Linked PriorityCustomer record (same real-world entity)',
     )
     salesperson_code = models.CharField(max_length=50, blank=True)
     salesperson_name = models.CharField(max_length=200, blank=True)
@@ -131,6 +140,24 @@ class PrioritySalesperson(models.Model):
 
     def __str__(self):
         return f"{self.agent_code} — {self.agent_name}"
+
+
+class PriorityCustomer(models.Model):
+    """Cached copy of Priority CUSTOMERS — active accounts synced from all companies."""
+    custname   = models.CharField(max_length=50)
+    custdes    = models.CharField(max_length=200, blank=True)
+    agent_code = models.CharField(max_length=50, blank=True)
+    agent_name = models.CharField(max_length=200, blank=True)
+    status     = models.CharField(max_length=50, blank=True)
+    company    = models.CharField(max_length=50)
+    synced_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('custname', 'company')]
+        ordering = ['custdes']
+
+    def __str__(self):
+        return f"{self.custdes} ({self.custname} @ {self.company})"
 
 
 class CustomerSalesRep(models.Model):

@@ -1,21 +1,33 @@
 import base64
 import json
+import os
 import urllib.error
 import urllib.request
 from urllib.parse import quote
 
 from django.core.management.base import BaseCommand
 
-from reports.models import Distributor, PriorityProduct, PrioritySalesperson
+from reports.models import Distributor, PriorityCustomer, PriorityProduct, PrioritySalesperson
 
-PRIORITY_BASE = 'https://api22.kramerav.com/odata/Priority/tabula.ini/krmel/'
-PRIORITY_AUTH = base64.b64encode(b'2B643D1E29D644BFAF00760B5336F405:PAT').decode()
+PRIORITY_ROOT = 'https://api22.kramerav.com/odata/Priority/tabula.ini/'
+# Priority ERP token — supplied via the PRIORITY_API_TOKEN env var (format: "<TOKEN>:PAT").
+# Placeholder default keeps real credentials out of source control.
+PRIORITY_TOKEN = os.environ.get('PRIORITY_API_TOKEN', 'REPLACE_WITH_PRIORITY_TOKEN:PAT')
+PRIORITY_AUTH = base64.b64encode(PRIORITY_TOKEN.encode()).decode()
 PAGE_SIZE = 2000
 
+# All Priority companies accessible via the API (ktech and kkorea return 400).
+PRIORITY_COMPANIES = [
+    'krmel', 'kaus', 'kcanada', 'kchile', 'chin', 'germany', 'khongk',
+    'india', 'kmexi', 'knewz', 'kuk', 'kca', 'kemea', 'ashb',
+    'sngpr', 'krmfr', 'ksweden', 'kusa21', 'kusmnt', 'krmnt',
+    'wowind', 'wowsing', 'zvusa', 'zvger',
+]
 
-def _get(path):
+
+def _get(path, company='krmel'):
     # Encode unsafe chars (e.g. spaces in part numbers) while preserving OData syntax
-    url = PRIORITY_BASE + quote(path, safe="?$=&,();':@/")
+    url = PRIORITY_ROOT + company + '/' + quote(path, safe="?$=&,();':@/")
     req = urllib.request.Request(
         url,
         headers={'Authorization': f'Basic {PRIORITY_AUTH}', 'Accept': 'application/json'},
@@ -24,7 +36,7 @@ def _get(path):
         return json.loads(r.read())
 
 
-def _get_all(entity, select, extra=''):
+def _get_all(entity, select, extra='', company='krmel'):
     """Fetch all rows from a Priority entity, handling 2000-row pagination."""
     rows = []
     skip = 0
@@ -32,7 +44,7 @@ def _get_all(entity, select, extra=''):
         path = f'{entity}?$top={PAGE_SIZE}&$skip={skip}&$select={select}'
         if extra:
             path += f'&{extra}'
-        data = _get(path)
+        data = _get(path, company=company)
         page = data.get('value', [])
         rows.extend(page)
         if len(page) < PAGE_SIZE:
@@ -42,7 +54,7 @@ def _get_all(entity, select, extra=''):
 
 
 class Command(BaseCommand):
-    help = 'Sync product catalog and salesperson data from Priority ERP'
+    help = 'Sync product catalog, salesperson, and customer data from Priority ERP'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -53,16 +65,36 @@ class Command(BaseCommand):
             '--agents-only', action='store_true',
             help='Only sync salesperson data (AGENTS + distributor mapping)',
         )
+        parser.add_argument(
+            '--customers-only', action='store_true',
+            help='Only sync customer data (CUSTOMERS — active, all companies)',
+        )
 
     def handle(self, *args, **options):
-        products_only = options['products_only']
-        agents_only = options['agents_only']
+        products_only  = options['products_only']
+        agents_only    = options['agents_only']
+        customers_only = options['customers_only']
 
-        if not agents_only:
+        # If a specific --*-only flag is set, run only that section.
+        # With no flag, run everything.
+        run_products  = not agents_only  and not customers_only
+        run_agents    = not products_only and not customers_only
+        run_customers = not products_only and not agents_only
+
+        if products_only:
+            run_products = True
+        if agents_only:
+            run_agents = True
+        if customers_only:
+            run_customers = True
+
+        if run_products:
             self._sync_products()
-        if not products_only:
+        if run_agents:
             self._sync_agents()
             self._sync_distributor_salespersons()
+        if run_customers:
+            self._sync_customers()
 
     def _sync_products(self):
         """
@@ -158,9 +190,13 @@ class Command(BaseCommand):
 
         for dist in dists:
             code = dist.priority_customer_code.strip()
+            # Determine which Priority company this distributor lives in
+            company = dist.priority_company if hasattr(dist, 'priority_company') and dist.priority_company else 'krmel'
             try:
-                data = _get(f'CUSTOMERS({code!r})?'
-                            '$select=CUSTNAME,CUSTDES,AGENTCODE,AGENTNAME,STATDES')
+                data = _get(
+                    f'CUSTOMERS({code!r})?$select=CUSTNAME,CUSTDES,AGENTCODE,AGENTNAME,STATDES',
+                    company=company,
+                )
                 agent_code = (data.get('AGENTCODE') or '').strip()
                 agent_name = (data.get('AGENTNAME') or '').strip()
                 dist.salesperson_code = agent_code
@@ -175,3 +211,56 @@ class Command(BaseCommand):
                 ))
             except Exception as e:
                 self.stderr.write(self.style.ERROR(f'  {dist.name}: {e}'))
+
+    def _sync_customers(self):
+        """Sync active customers from all Priority companies into PriorityCustomer."""
+        self.stdout.write('Syncing Priority customers (CUSTOMERS — Active only, all companies)…')
+        total_created = total_updated = total_skipped = 0
+
+        for company in PRIORITY_COMPANIES:
+            try:
+                rows = _get_all(
+                    'CUSTOMERS',
+                    'CUSTNAME,CUSTDES,AGENTCODE,AGENTNAME,STATDES',
+                    extra="$filter=STATDES eq 'Active'",
+                    company=company,
+                )
+            except urllib.error.HTTPError as e:
+                self.stderr.write(self.style.WARNING(f'  {company}: HTTP {e.code} — skipping'))
+                total_skipped += 1
+                continue
+            except Exception as e:
+                self.stderr.write(self.style.WARNING(f'  {company}: {e} — skipping'))
+                total_skipped += 1
+                continue
+
+            created = updated = 0
+            for row in rows:
+                code = (row.get('CUSTNAME') or '').strip()
+                if not code:
+                    continue
+                _, is_new = PriorityCustomer.objects.update_or_create(
+                    custname=code,
+                    company=company,
+                    defaults={
+                        'custdes':    (row.get('CUSTDES')    or '').strip(),
+                        'agent_code': (row.get('AGENTCODE')  or '').strip(),
+                        'agent_name': (row.get('AGENTNAME')  or '').strip(),
+                        'status':     (row.get('STATDES')    or '').strip(),
+                    },
+                )
+                if is_new:
+                    created += 1
+                else:
+                    updated += 1
+
+            self.stdout.write(self.style.SUCCESS(
+                f'  {company}: {created} created, {updated} updated ({created + updated} total)'
+            ))
+            total_created += created
+            total_updated += updated
+
+        self.stdout.write(self.style.SUCCESS(
+            f'Customers done: {total_created} created, {total_updated} updated'
+            + (f', {total_skipped} companies skipped' if total_skipped else '')
+        ))
