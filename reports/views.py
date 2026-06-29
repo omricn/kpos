@@ -1,6 +1,7 @@
 import csv
 import json
 import openpyxl
+from urllib.parse import urlencode
 from decimal import Decimal
 from datetime import date as date_cls, timedelta
 from datetime import datetime as dt_class
@@ -408,14 +409,16 @@ def dashboard(request):
     date_to   = request.session.get('date_to',   '')
     distributor_id = request.GET.get('distributor', '')
 
-    # Region: explicit URL param updates session; navigation falls back to session
+    # Region: explicit URL param updates session then redirects to clean URL
     region_param = request.GET.get('region')
     if region_param is not None:
         region = region_param.strip()
-        request.session['region'] = region
-        request.session.modified = True
-    else:
-        region = request.session.get('region', '')
+        if region != request.session.get('region', ''):
+            request.session['region'] = region
+            request.session.modified = True
+        other = {k: v for k, v in request.GET.items() if k != 'region'}
+        return redirect(request.path + ('?' + urlencode(other) if other else ''))
+    region = request.session.get('region', '')
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
@@ -852,14 +855,16 @@ def export_csv(request, pk):
 
 
 def distributor_list(request):
-    # Region: explicit URL param updates session; navigation falls back to session
+    # Region: explicit URL param updates session then redirects to clean URL
     region_param = request.GET.get('region')
     if region_param is not None:
         selected_region = region_param.strip()
-        request.session['region'] = selected_region
-        request.session.modified = True
-    else:
-        selected_region = request.session.get('region', '')
+        if selected_region != request.session.get('region', ''):
+            request.session['region'] = selected_region
+            request.session.modified = True
+        other = {k: v for k, v in request.GET.items() if k != 'region'}
+        return redirect(request.path + ('?' + urlencode(other) if other else ''))
+    selected_region = request.session.get('region', '')
     period    = request.session.get('period',    '')
     date_from = request.session.get('date_from', '')
     date_to   = request.session.get('date_to',   '')
@@ -1010,14 +1015,16 @@ def product_list(request):
     if sort_by not in ('revenue', 'units'):
         sort_by = 'revenue'
 
-    # Region: explicit URL param updates session; navigation falls back to session
+    # Region: explicit URL param updates session then redirects to clean URL
     region_param = request.GET.get('region')
     if region_param is not None:
         region = region_param.strip()
-        request.session['region'] = region
-        request.session.modified = True
-    else:
-        region = request.session.get('region', '')
+        if region != request.session.get('region', ''):
+            request.session['region'] = region
+            request.session.modified = True
+        other = {k: v for k, v in request.GET.items() if k != 'region'}
+        return redirect(request.path + ('?' + urlencode(other) if other else ''))
+    region = request.session.get('region', '')
 
     selected_currency = request.session.get('currency', 'USD')
     currency_symbol = _currency_symbol(selected_currency)
@@ -1426,14 +1433,16 @@ def revenue_view(request):
 def salesperson_list(request):
     selected_sp = request.GET.get('salesperson', '').strip()
 
-    # Region: explicit URL param updates session; navigation falls back to session
+    # Region: explicit URL param updates session then redirects to clean URL
     region_param = request.GET.get('region')
     if region_param is not None:
         region = region_param.strip()
-        request.session['region'] = region
-        request.session.modified = True
-    else:
-        region = request.session.get('region', '')
+        if region != request.session.get('region', ''):
+            request.session['region'] = region
+            request.session.modified = True
+        other = {k: v for k, v in request.GET.items() if k != 'region'}
+        return redirect(request.path + ('?' + urlencode(other) if other else ''))
+    region = request.session.get('region', '')
 
     period    = request.session.get('period',    '')
     date_from = request.session.get('date_from', '')
