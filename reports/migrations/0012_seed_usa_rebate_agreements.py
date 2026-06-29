@@ -11,7 +11,7 @@ USA_REBATES = [
     ('BTX',                            '250000.00', '1000000.00', '0.0300', 'Distributor Standard', 'btx',             'C701003', 'kusa21'),
     ('GRAYBAR ELECTRIC COMPANY, INC.', '250000.00', '1000000.00', '0.0300', 'Distributor Standard', 'graybar',        'C701045', 'kusa21'),
     ('JB&A DISTRIBUTION',              '500000.00', '2000000.00', '0.0400', 'Distributor Platinum', 'jba',             'D064532', 'kusa21'),
-    ('STARIN',                         '250000.00', '1000000.00', '0.0300', 'Distributor Standard', None,              'C106101', 'kusa21'),
+    ('STARIN',                         '250000.00', '1000000.00', '0.0300', 'Distributor Standard', 'starin',          'C106101', 'kusa21'),
     ('TD SYNNEX CORPORATION',          '500000.00', '2000000.00', '0.0400', 'Distributor Platinum', 'td-synnex',       'C108076', 'kusa21'),
     ('TOWER PRODUCTS',                 '250000.00', '1000000.00', '0.0300', 'Distributor Standard', 'tower-products',  'C701001', 'kusa21'),
     ('B&H PHOTO & ELECTRONICS CORP.',  '650000.00', '2600000.00', '0.1000', 'Special program',      None,              'C701042', 'kusa21'),

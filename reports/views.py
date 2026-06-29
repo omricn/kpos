@@ -240,10 +240,21 @@ def set_currency(request):
 
 def set_region(request):
     """POST endpoint to set session region filter."""
+    from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
     region = request.POST.get('region', '')
     request.session['region'] = region
     request.session.modified = True
-    return redirect(request.POST.get('next', '/'))
+    next_url = request.POST.get('next', '/')
+    if not next_url.startswith('/'):
+        next_url = '/'
+    # Strip any stale ?region= param from the redirect target so the page
+    # doesn't immediately override the session we just wrote.
+    parsed = urlparse(next_url)
+    params = parse_qs(parsed.query, keep_blank_values=False)
+    params.pop('region', None)
+    clean_query = urlencode({k: v[0] for k, v in params.items()})
+    clean_url = urlunparse(('', '', parsed.path, parsed.params, clean_query, parsed.fragment))
+    return redirect(clean_url or '/')
 
 
 def set_period(request):
@@ -2174,12 +2185,16 @@ def rebates_view(request):
 
     q_months = {1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12]}
 
+    region = request.session.get('region', '')
+
     agreements = list(
         RebateAgreement.objects
         .filter(active=True)
         .select_related('distributor', 'priority_customer')
         .order_by('customer_name')
     )
+    if region:
+        agreements = [a for a in agreements if a.distributor and a.distributor.region == region]
 
     dist_ids = [a.distributor_id for a in agreements if a.distributor_id]
 
@@ -2243,12 +2258,10 @@ def rebates_view(request):
     total_yr_rebate = sum(r['yr_rebate'] for r in results)
     earned_count    = sum(1 for r in results if r['q_earned'])
 
-    available_years = sorted(
+    available_years = sorted(set(
         POSRecord.objects.filter(invoice_date__isnull=False)
         .values_list('invoice_date__year', flat=True)
-        .distinct(),
-        reverse=True,
-    ) or [current_year]
+    ), reverse=True) or [current_year]
 
     return render(request, 'reports/rebates.html', {
         'results':          results,
@@ -2261,6 +2274,7 @@ def rebates_view(request):
         'earned_count':     earned_count,
         'total_agreements': len(results),
         'available_years':  available_years,
+        'selected_region':  region,
         'page_title':       'VIR Rebates',
     })
 
