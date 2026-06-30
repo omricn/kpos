@@ -2102,8 +2102,30 @@ def ai_chat(request):
         return JsonResponse({'reply': 'AI assistant is not configured yet.', 'wants_export': False})
 
     page_context = (body.get('page_context') or '').strip()
+    page_data_json = (body.get('page_data') or '').strip()
     data_context = _build_ai_context()
     today_str = date_cls.today().strftime('%B %d, %Y')
+
+    # Format what the user currently sees on screen
+    visible_data_section = ''
+    if page_data_json:
+        try:
+            pd = json.loads(page_data_json)
+            lines = []
+            if pd.get('kpis'):
+                lines.append('KPIs: ' + ' | '.join(pd['kpis'][:8]))
+            for tbl in pd.get('tables', [])[:2]:
+                hdrs = tbl.get('headers', [])
+                rows = tbl.get('rows', [])
+                if hdrs and rows:
+                    lines.append(f'\nTable ({len(rows)} rows shown):')
+                    lines.append(' | '.join(hdrs))
+                    for row in rows:
+                        lines.append(' | '.join(row))
+            if lines:
+                visible_data_section = '\n\n## What the user currently sees on screen\n' + '\n'.join(lines)
+        except Exception:
+            pass
 
     system_prompt = f"""You are KPOS Assistant, an AI analyst embedded in Kramer Electronics' internal POS analytics platform.
 
@@ -2115,7 +2137,7 @@ Kramer distributors submit weekly/monthly Point-of-Sale reports. Each record = o
 - Not every distributor reports every field (e.g., some don't have sales rep data).
 
 ## Current screen
-{page_context if page_context else 'Unknown screen'}
+{page_context if page_context else 'Unknown screen'}{visible_data_section}
 
 ## Data available
 {data_context}
@@ -2125,7 +2147,7 @@ Today: {today_str}. All revenue is in USD.
 - ALWAYS call a tool for any data question. Never rely on a prior answer — always re-query for fresh results.
 - For follow-up questions ("top 3", "same but for EMEA", "what about February?"), carry the filters from context into the tool call.
 - If a user says "this year" use {today_str[:4]}; "last month" use the prior calendar month; "this month" use the current month.
-- When the user says "distributors on this screen", "in this view", "listed here", or similar — use the distributor names and codes from the Current screen section above to scope your tool calls. Do not query all distributors.
+- When the user refers to "distributors on this screen", "in this view", "listed here", or similar — the "What the user currently sees" section above shows exactly what is on screen. Use those specific names/codes to scope your queries.
 - Keep replies short and direct — 2–4 sentences unless the user asks for detail. Lead with the answer, not preamble.
 - Format numbers: $1,234,567 for revenue, 1,234 for units. Bold key figures if markdown helps.
 - If the tool returns no data, say so plainly: "No records found for [filter]." Don't speculate about why.

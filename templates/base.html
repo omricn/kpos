@@ -282,6 +282,43 @@ var KPOS_AI_PAGE_CONTEXT = (document.getElementById('ai-page-ctx') || {}).textCo
   var panelEl = document.getElementById('aiPanel');
   if (panelEl) panelEl.addEventListener('click', function (e) { e.stopPropagation(); });
 
+  function getPageData() {
+    var result = { kpis: [], tables: [] };
+
+    // KPI cards: card-body with a text-muted label + h4 value
+    document.querySelectorAll('.card-body').forEach(function(card) {
+      var label = card.querySelector('p.text-muted');
+      var value = card.querySelector('h4');
+      if (label && value) {
+        var lbl = label.textContent.trim();
+        var val = value.textContent.trim();
+        if (lbl && val) result.kpis.push(lbl + ': ' + val);
+      }
+    });
+
+    // Tables: read headers + up to 50 body rows
+    document.querySelectorAll('main table').forEach(function(table) {
+      var headers = [];
+      table.querySelectorAll('thead th').forEach(function(th) {
+        headers.push(th.textContent.trim());
+      });
+      if (!headers.length) return;
+
+      var rows = [];
+      table.querySelectorAll('tbody tr').forEach(function(tr) {
+        var cells = [];
+        tr.querySelectorAll('td').forEach(function(td) {
+          cells.push(td.textContent.replace(/\s+/g, ' ').trim());
+        });
+        if (cells.some(function(c) { return c; })) rows.push(cells);
+      });
+
+      if (rows.length) result.tables.push({ headers: headers, rows: rows.slice(0, 50) });
+    });
+
+    return result;
+  }
+
   window.sendAiMessage = function () {
     var input = document.getElementById('aiInput');
     var btn   = document.getElementById('aiSendBtn');
@@ -298,7 +335,7 @@ var KPOS_AI_PAGE_CONTEXT = (document.getElementById('ai-page-ctx') || {}).textCo
     fetch('{% url "ai_chat" %}', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-      body: JSON.stringify({ message: msg, page_context: KPOS_AI_PAGE_CONTEXT }),
+      body: JSON.stringify({ message: msg, page_context: KPOS_AI_PAGE_CONTEXT, page_data: JSON.stringify(getPageData()) }),
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
