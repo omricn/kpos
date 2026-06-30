@@ -173,26 +173,48 @@
             <td>{{ r.currency|default:"" }}</td>
             <td class="text-muted small">{{ r.order_ref|default:"—" }}</td>
             <td class="text-muted small">{{ r.invoice_ref|default:"—" }}</td>
-            <td class="text-nowrap rep-cell" style="min-width:130px" onclick="event.stopPropagation()">
+            <td class="text-nowrap rep-cell" style="min-width:160px" onclick="event.stopPropagation()">
               <span class="rep-label {% if r.salesperson_override_id %}rep-override{% endif %}"
                     data-record="{{ r.pk }}"
                     data-override-id="{{ r.salesperson_override_id|default:'' }}">
-                {{ r.eff_rep_name|default:"—" }}
+                {% if r.salesperson_override_id and r.salesperson_override_2_id and r.salesperson_split_pct < 100 %}
+                  {{ r.eff_rep_name }} ({{ r.salesperson_split_pct }}%) / {{ r.salesperson_override_2.agent_name }} ({{ r.split_pct_2|floatformat:0 }}%)
+                {% else %}
+                  {{ r.eff_rep_name|default:"—" }}
+                {% endif %}
               </span>
               <button class="btn btn-link btn-sm p-0 ms-1 rep-edit-btn text-muted"
                       data-record="{{ r.pk }}"
-                      data-current="{{ r.salesperson_override_id|default:'' }}"
                       title="Override rep for this invoice"
                       style="vertical-align:baseline">
                 <i class="bi bi-pencil-square" style="font-size:.7rem"></i>
               </button>
-              <div class="rep-editor d-none" id="rep-editor-{{ r.pk }}">
-                <select class="form-select form-select-sm mt-1 rep-select" style="font-size:.8rem">
-                  <option value="">— clear override —</option>
-                  {% for sp in all_salespersons %}
-                  <option value="{{ sp.pk }}" {% if r.salesperson_override_id == sp.pk %}selected{% endif %}>{{ sp.agent_name }}</option>
-                  {% endfor %}
-                </select>
+              <div class="rep-editor d-none" id="rep-editor-{{ r.pk }}"
+                   data-rep1-name="{{ r.salesperson_override.agent_name|default:'' }}"
+                   data-rep2-name="{{ r.salesperson_override_2.agent_name|default:'' }}"
+                   data-split-pct="{{ r.salesperson_split_pct }}">
+                <!-- Rep 1 autocomplete -->
+                <input type="text" class="form-control form-control-sm mt-1 rep-input-1"
+                       list="sp-list" placeholder="Type rep name or clear…"
+                       autocomplete="off" style="font-size:.8rem; min-width:170px">
+                <!-- Split toggle -->
+                <div class="mt-1">
+                  <a href="#" class="split-toggle text-muted small text-decoration-none">
+                    <i class="bi bi-plus-circle me-1 split-icon"></i><span class="split-toggle-label">Split between 2 reps</span>
+                  </a>
+                </div>
+                <!-- Split section -->
+                <div class="split-section d-none mt-1 p-2 rounded" style="background:var(--bg-elevated);border:1px solid var(--border-color)">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <label class="small text-muted mb-0" style="width:52px;flex-shrink:0">Rep 1 %</label>
+                    <input type="number" class="form-control form-control-sm split-pct-input"
+                           min="1" max="99" value="50" style="width:64px; font-size:.8rem">
+                    <span class="small text-muted split-pct-2-label">Rep 2: 50%</span>
+                  </div>
+                  <input type="text" class="form-control form-control-sm rep-input-2"
+                         list="sp-list" placeholder="Type rep 2 name…"
+                         autocomplete="off" style="font-size:.8rem; min-width:170px">
+                </div>
                 <div class="d-flex gap-1 mt-1">
                   <button class="btn btn-kramer btn-sm rep-save-btn" data-record="{{ r.pk }}" style="font-size:.75rem;padding:2px 8px">Save</button>
                   <button class="btn btn-outline-secondary btn-sm rep-cancel-btn" style="font-size:.75rem;padding:2px 8px">✕</button>
@@ -281,7 +303,8 @@
 .rep-override { color: var(--kramer-purple); font-weight: 600; }
 .rep-edit-btn { opacity: 0; transition: opacity .15s; }
 .rep-cell:hover .rep-edit-btn { opacity: 1; }
-.rep-editor .form-select { min-width: 160px; }
+.rep-editor { min-width: 180px; }
+.split-toggle { font-size: .75rem; }
 </style>
 {% endblock %}
 
@@ -308,19 +331,95 @@
   fpReady = true;
 })();
 </script>
+<!-- Shared datalist for rep autocomplete (one per page, reused by all editors) -->
+<datalist id="sp-list">
+  {% for sp in all_salespersons %}<option value="{{ sp.agent_name }}"></option>{% endfor %}
+</datalist>
 <script>
 const CSRF = '{{ csrf_token }}';
 const SET_REP_URL = '{% url "set_record_rep" %}';
+
+// Build name→pk map from context JSON
+const SP_MAP = {
+  {% for sp in all_salespersons %}"{{ sp.agent_name|escapejs }}": "{{ sp.pk }}"{% if not forloop.last %},{% endif %}{% endfor %}
+};
+
+function closeAllEditors() {
+  document.querySelectorAll('.rep-editor').forEach(el => el.classList.add('d-none'));
+  document.querySelectorAll('.rep-edit-btn').forEach(b => b.classList.remove('d-none'));
+}
+
+function initEditor(editor) {
+  const rep1Name = editor.dataset.rep1Name || '';
+  const rep2Name = editor.dataset.rep2Name || '';
+  const splitPct = parseInt(editor.dataset.splitPct) || 100;
+
+  const input1 = editor.querySelector('.rep-input-1');
+  const input2 = editor.querySelector('.rep-input-2');
+  const pctInput = editor.querySelector('.split-pct-input');
+  const pctLabel = editor.querySelector('.split-pct-2-label');
+  const splitSection = editor.querySelector('.split-section');
+  const toggleLabel = editor.querySelector('.split-toggle-label');
+  const toggleIcon = editor.querySelector('.split-icon');
+
+  input1.value = rep1Name;
+
+  if (rep2Name && splitPct < 100) {
+    splitSection.classList.remove('d-none');
+    input2.value = rep2Name;
+    pctInput.value = splitPct;
+    pctLabel.textContent = 'Rep 2: ' + (100 - splitPct) + '%';
+    toggleLabel.textContent = 'Remove split';
+    toggleIcon.className = 'bi bi-dash-circle me-1 split-icon';
+  } else {
+    splitSection.classList.add('d-none');
+    input2.value = '';
+    pctInput.value = 50;
+    pctLabel.textContent = 'Rep 2: 50%';
+    toggleLabel.textContent = 'Split between 2 reps';
+    toggleIcon.className = 'bi bi-plus-circle me-1 split-icon';
+  }
+  input1.focus();
+}
 
 document.querySelectorAll('.rep-edit-btn').forEach(btn => {
   btn.addEventListener('click', e => {
     e.stopPropagation();
     const rid = btn.dataset.record;
-    document.querySelectorAll('.rep-editor').forEach(el => el.classList.add('d-none'));
-    document.querySelectorAll('.rep-edit-btn').forEach(b => b.classList.remove('d-none'));
+    closeAllEditors();
     const editor = document.getElementById('rep-editor-' + rid);
     editor.classList.remove('d-none');
     btn.classList.add('d-none');
+    initEditor(editor);
+  });
+});
+
+document.querySelectorAll('.split-toggle').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const editor = link.closest('.rep-editor');
+    const splitSection = editor.querySelector('.split-section');
+    const toggleLabel = editor.querySelector('.split-toggle-label');
+    const toggleIcon = editor.querySelector('.split-icon');
+    const isOpen = !splitSection.classList.contains('d-none');
+    if (isOpen) {
+      splitSection.classList.add('d-none');
+      toggleLabel.textContent = 'Split between 2 reps';
+      toggleIcon.className = 'bi bi-plus-circle me-1 split-icon';
+    } else {
+      splitSection.classList.remove('d-none');
+      toggleLabel.textContent = 'Remove split';
+      toggleIcon.className = 'bi bi-dash-circle me-1 split-icon';
+      editor.querySelector('.rep-input-2').focus();
+    }
+  });
+});
+
+document.querySelectorAll('.split-pct-input').forEach(input => {
+  input.addEventListener('input', () => {
+    const val = Math.max(1, Math.min(99, parseInt(input.value) || 50));
+    input.closest('.split-section').querySelector('.split-pct-2-label').textContent = 'Rep 2: ' + (100 - val) + '%';
   });
 });
 
@@ -339,9 +438,20 @@ document.querySelectorAll('.rep-save-btn').forEach(btn => {
     e.stopPropagation();
     const rid = btn.dataset.record;
     const editor = document.getElementById('rep-editor-' + rid);
-    const sel = editor.querySelector('.rep-select');
-    const spId = sel.value;
-    const repName = spId ? sel.options[sel.selectedIndex].text : null;
+    const input1 = editor.querySelector('.rep-input-1');
+    const splitSection = editor.querySelector('.split-section');
+    const hasSplit = !splitSection.classList.contains('d-none');
+    const input2 = editor.querySelector('.rep-input-2');
+    const pctInput = editor.querySelector('.split-pct-input');
+
+    const rep1Name = input1.value.trim();
+    const spId1 = rep1Name ? (SP_MAP[rep1Name] || '') : '';
+    const rep2Name = hasSplit ? input2.value.trim() : '';
+    const spId2 = (hasSplit && rep2Name) ? (SP_MAP[rep2Name] || '') : '';
+    const splitPct = hasSplit && spId2 ? Math.max(1, Math.min(99, parseInt(pctInput.value) || 50)) : 100;
+
+    if (rep1Name && !spId1) { alert('Rep 1 name not found. Please select from the dropdown suggestions.'); return; }
+    if (hasSplit && rep2Name && !spId2) { alert('Rep 2 name not found. Please select from the dropdown suggestions.'); return; }
 
     btn.disabled = true;
     btn.textContent = '…';
@@ -350,19 +460,31 @@ document.querySelectorAll('.rep-save-btn').forEach(btn => {
       const fd = new FormData();
       fd.append('csrfmiddlewaretoken', CSRF);
       fd.append('record_id', rid);
-      fd.append('salesperson_id', spId);
+      fd.append('salesperson_id', spId1);
+      fd.append('salesperson_id_2', spId2);
+      fd.append('split_pct', splitPct);
+
       const res = await fetch(SET_REP_URL, { method: 'POST', body: fd });
       const data = await res.json();
       if (data.ok) {
         const label = document.querySelector('.rep-label[data-record="' + rid + '"]');
-        if (repName) {
-          label.textContent = repName;
+        if (data.rep_name) {
+          let labelText = data.rep_name;
+          if (data.rep2_name) {
+            labelText = data.rep_name + ' (' + data.split_pct + '%) / ' + data.rep2_name + ' (' + (100 - data.split_pct) + '%)';
+          }
+          label.textContent = labelText;
           label.classList.add('rep-override');
-          label.dataset.overrideId = spId;
+          // Update editor data attrs for next open
+          editor.dataset.rep1Name = data.rep_name;
+          editor.dataset.rep2Name = data.rep2_name || '';
+          editor.dataset.splitPct = data.split_pct;
         } else {
           label.textContent = '—';
           label.classList.remove('rep-override');
-          label.dataset.overrideId = '';
+          editor.dataset.rep1Name = '';
+          editor.dataset.rep2Name = '';
+          editor.dataset.splitPct = '100';
         }
         editor.classList.add('d-none');
         document.querySelector('.rep-edit-btn[data-record="' + rid + '"]').classList.remove('d-none');

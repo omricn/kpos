@@ -95,6 +95,14 @@ class POSRecord(models.Model):
         'PrioritySalesperson', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='override_records'
     )
+    salesperson_override_2 = models.ForeignKey(
+        'PrioritySalesperson', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='override_records_2'
+    )
+    salesperson_split_pct = models.PositiveSmallIntegerField(
+        default=100,
+        help_text='% of invoice credited to rep 1 (rest to rep 2). 100 = no split.'
+    )
 
     class Meta:
         ordering = ['-invoice_date', 'customer_name']

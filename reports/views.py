@@ -670,7 +670,9 @@ def dashboard(request):
 
 def distributor_records(request, pk):
     distributor = get_object_or_404(Distributor, pk=pk)
-    records = POSRecord.objects.filter(distributor=distributor).select_related('upload', 'salesperson_override')
+    records = POSRecord.objects.filter(distributor=distributor).select_related(
+        'upload', 'salesperson_override', 'salesperson_override_2'
+    )
 
     # Filters
     q = request.GET.get('q', '').strip()
@@ -706,9 +708,12 @@ def distributor_records(request, pk):
         date_to=Max('invoice_date'),
     )
 
-    # Annotate each record with its effective rep (override > customer assignment > distributor)
+    # Annotate each record with effective rep and split complement pct for template use
     eff_name, eff_code = _effective_rep_annotations()
-    records = records.annotate(eff_rep_name=eff_name).order_by('-invoice_date', 'pk')
+    records = records.annotate(
+        eff_rep_name=eff_name,
+        split_pct_2=ExpressionWrapper(Value(100) - F('salesperson_split_pct'), output_field=DecimalField(max_digits=5, decimal_places=0)),
+    ).order_by('-invoice_date', 'pk')
 
     # Paginate — 100 rows per page keeps the correlated subquery manageable
     paginator = Paginator(records, 100)
@@ -1476,6 +1481,36 @@ def salesperson_list(request):
         )
         .order_by('-revenue')
     )
+
+    # Adjust for split invoices: move secondary rep's share from primary to secondary
+    split_qs = qs.filter(salesperson_override_2__isnull=False).exclude(salesperson_split_pct=100)
+    if split_qs.exists():
+        sp_dict = {s['eff_rep_name']: s for s in sp_data}
+        split_records = list(
+            _annotate_converted(split_qs, selected_currency).values(
+                'eff_rep_name', 'eff_rep_code',
+                'salesperson_override_2__agent_name',
+                'salesperson_override_2__agent_code',
+                'salesperson_split_pct',
+                'converted_value',
+            )
+        )
+        for rec in split_records:
+            pct2 = 100 - rec['salesperson_split_pct']
+            secondary_amount = float(rec['converted_value'] or 0) * pct2 / 100
+            primary_name   = rec['eff_rep_name']
+            secondary_name = rec['salesperson_override_2__agent_name']
+            secondary_code = rec['salesperson_override_2__agent_code']
+            if primary_name in sp_dict:
+                sp_dict[primary_name]['revenue'] = float(sp_dict[primary_name]['revenue'] or 0) - secondary_amount
+            if secondary_name not in sp_dict:
+                sp_dict[secondary_name] = {
+                    'eff_rep_name': secondary_name, 'eff_rep_code': secondary_code,
+                    'revenue': 0.0, 'units': 0, 'dist_count': 0, 'records': 0,
+                }
+            sp_dict[secondary_name]['revenue'] = float(sp_dict[secondary_name].get('revenue') or 0) + secondary_amount
+        sp_data = sorted(sp_dict.values(), key=lambda s: -(float(s.get('revenue') or 0)))
+
     total_rev = sum(float(s['revenue'] or 0) for s in sp_data) or 1
     for s in sp_data:
         s['revenue'] = float(s['revenue'] or 0)
@@ -1624,24 +1659,41 @@ def set_record_rep(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    record_id = request.POST.get('record_id', '').strip()
+    record_id      = request.POST.get('record_id', '').strip()
     salesperson_id = request.POST.get('salesperson_id', '').strip()
+    sp2_id         = request.POST.get('salesperson_id_2', '').strip()
+    split_pct_raw  = request.POST.get('split_pct', '100').strip()
+
+    try:
+        split_pct = max(1, min(99, int(split_pct_raw)))
+    except (ValueError, TypeError):
+        split_pct = 100
 
     record = get_object_or_404(POSRecord, pk=record_id)
 
     if salesperson_id:
-        sp = get_object_or_404(PrioritySalesperson, pk=salesperson_id)
-        record.salesperson_override = sp
-        record.save(update_fields=['salesperson_override'])
+        sp  = get_object_or_404(PrioritySalesperson, pk=salesperson_id)
+        sp2 = get_object_or_404(PrioritySalesperson, pk=sp2_id) if sp2_id else None
+
+        record.salesperson_override   = sp
+        record.salesperson_override_2 = sp2
+        record.salesperson_split_pct  = split_pct if sp2 else 100
+        record.save(update_fields=['salesperson_override', 'salesperson_override_2', 'salesperson_split_pct'])
+
         return JsonResponse({
-            'ok': True,
-            'rep_name': sp.agent_name,
-            'rep_id': sp.pk,
-            'source': 'override',
+            'ok':        True,
+            'rep_name':  sp.agent_name,
+            'rep_id':    sp.pk,
+            'rep2_name': sp2.agent_name if sp2 else None,
+            'rep2_id':   sp2.pk if sp2 else None,
+            'split_pct': record.salesperson_split_pct,
+            'source':    'override',
         })
     else:
-        record.salesperson_override = None
-        record.save(update_fields=['salesperson_override'])
+        record.salesperson_override   = None
+        record.salesperson_override_2 = None
+        record.salesperson_split_pct  = 100
+        record.save(update_fields=['salesperson_override', 'salesperson_override_2', 'salesperson_split_pct'])
         return JsonResponse({'ok': True, 'rep_name': None, 'source': 'cleared'})
 
 
