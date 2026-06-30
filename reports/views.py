@@ -2241,9 +2241,10 @@ def rebates_view(request):
         quarter = int(request.GET.get('quarter', current_q))
     except (TypeError, ValueError):
         quarter = current_q
-    if quarter not in (1, 2, 3, 4):
+    if quarter not in (0, 1, 2, 3, 4):  # 0 = full-year view
         quarter = current_q
 
+    yearly_mode = quarter == 0
     q_months = {1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12]}
 
     region = request.session.get('region', '')
@@ -2262,14 +2263,15 @@ def rebates_view(request):
     q_rev_map = {}
     yr_rev_map = {}
     if dist_ids:
-        for row in (
-            POSRecord.objects
-            .filter(distributor_id__in=dist_ids, invoice_date__year=year,
-                    invoice_date__month__in=q_months[quarter], invoiced_value__isnull=False)
-            .values('distributor_id')
-            .annotate(rev=_usd_sum_expr())
-        ):
-            q_rev_map[row['distributor_id']] = float(row['rev'] or 0)
+        if not yearly_mode:
+            for row in (
+                POSRecord.objects
+                .filter(distributor_id__in=dist_ids, invoice_date__year=year,
+                        invoice_date__month__in=q_months[quarter], invoiced_value__isnull=False)
+                .values('distributor_id')
+                .annotate(rev=_usd_sum_expr())
+            ):
+                q_rev_map[row['distributor_id']] = float(row['rev'] or 0)
 
         for row in (
             POSRecord.objects
@@ -2297,38 +2299,41 @@ def rebates_view(request):
         yr_rebate = yr_rev * pct if yr_rev >= thr_yr and thr_yr else 0
 
         results.append({
-            'agreement':  agr,
-            'q_rev':      q_rev,
-            'yr_rev':     yr_rev,
-            'thr_q':      thr_q,
-            'thr_yr':     thr_yr,
-            'pct':        pct,
+            'agreement':   agr,
+            'q_rev':       q_rev,
+            'yr_rev':      yr_rev,
+            'thr_q':       thr_q,
+            'thr_yr':      thr_yr,
+            'pct':         pct,
             'pct_display': f"{pct*100:.1f}%",
-            'q_attain':   q_attain,
-            'yr_attain':  yr_attain,
-            'q_rebate':   q_rebate,
-            'yr_rebate':  yr_rebate,
-            'q_earned':   q_rev  >= thr_q  and thr_q  > 0,
-            'yr_earned':  yr_rev >= thr_yr and thr_yr > 0,
-            'has_pos':    dist_id is not None,
+            'q_attain':    q_attain,
+            'yr_attain':   yr_attain,
+            'q_rebate':    q_rebate,
+            'yr_rebate':   yr_rebate,
+            'q_earned':    q_rev  >= thr_q  and thr_q  > 0,
+            'yr_earned':   yr_rev >= thr_yr and thr_yr > 0,
+            'has_pos':     dist_id is not None,
         })
 
-    results.sort(key=lambda x: -x['q_rev'])
+    results.sort(key=lambda x: -(x['yr_rev'] if yearly_mode else x['q_rev']))
 
     total_q_rebate  = sum(r['q_rebate']  for r in results)
     total_yr_rebate = sum(r['yr_rebate'] for r in results)
-    earned_count    = sum(1 for r in results if r['q_earned'])
+    earned_count    = sum(1 for r in results if (r['yr_earned'] if yearly_mode else r['q_earned']))
 
     available_years = sorted(set(
         POSRecord.objects.filter(invoice_date__isnull=False)
         .values_list('invoice_date__year', flat=True)
     ), reverse=True) or [current_year]
 
+    q_label = f"Q{quarter} {year}" if not yearly_mode else str(year)
+
     return render(request, 'reports/rebates.html', {
         'results':          results,
         'year':             year,
         'quarter':          quarter,
-        'q_label':          f"Q{quarter} {year}",
+        'yearly_mode':      yearly_mode,
+        'q_label':          q_label,
         'yr_label':         str(year),
         'total_q_rebate':   total_q_rebate,
         'total_yr_rebate':  total_yr_rebate,

@@ -18,6 +18,8 @@
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body py-3 px-4">
     <form class="row g-3 align-items-end" method="get">
+      <!-- Preserve current period when year changes -->
+      <input type="hidden" name="quarter" value="{{ quarter }}">
 
       <div class="col-auto">
         <label class="filter-label">Year</label>
@@ -29,15 +31,20 @@
       </div>
 
       <div class="col-auto">
-        <label class="filter-label">Quarter</label>
+        <label class="filter-label">Period</label>
         <div class="btn-group btn-group-sm">
           {% for q in "1234" %}
           <button type="submit" name="quarter" value="{{ q }}"
-            class="btn {% if quarter == q|add:0 %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+            class="btn {% if not yearly_mode and quarter == q|add:0 %}btn-primary{% else %}btn-outline-secondary{% endif %}"
             style="min-width:40px">
             Q{{ q }}
           </button>
           {% endfor %}
+          <button type="submit" name="quarter" value="0"
+            class="btn {% if yearly_mode %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+            style="min-width:80px">
+            Full Year
+          </button>
         </div>
       </div>
 
@@ -46,6 +53,35 @@
 </div>
 
 <!-- Summary KPI cards -->
+{% if yearly_mode %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Agreements Active</p>
+        <h4 class="fw-bold mb-0">{{ total_agreements }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Earned — Full Year {{ yr_label }}</p>
+        <h4 class="fw-bold mb-0">{{ earned_count }}</h4>
+        <p class="text-muted small mb-0">of {{ total_agreements }} met annual threshold</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Total Rebate — Full Year {{ yr_label }}</p>
+        <h4 class="fw-bold mb-0 text-success">${{ total_yr_rebate|floatformat:0|intcomma }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card border-0 shadow-sm h-100">
@@ -81,11 +117,16 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 <!-- Rebate table -->
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-transparent py-3 px-4 d-flex align-items-center justify-content-between">
+    {% if yearly_mode %}
+    <h6 class="mb-0 fw-semibold">Rebate Attainment — Full Year {{ yr_label }}</h6>
+    {% else %}
     <h6 class="mb-0 fw-semibold">Rebate Attainment — {{ q_label }}</h6>
+    {% endif %}
     <small class="text-muted">Revenue from POS sell-through data (USD)</small>
   </div>
   <div class="card-body p-0">
@@ -96,12 +137,19 @@
             <th class="ps-4">Distributor</th>
             <th>Classification</th>
             <th>VIR %</th>
+            {% if yearly_mode %}
+            <th class="text-end">Threshold Year</th>
+            <th class="text-end">Revenue {{ yr_label }}</th>
+            <th style="min-width:120px">Attainment Year</th>
+            <th class="text-end">Rebate {{ yr_label }}</th>
+            {% else %}
             <th class="text-end">Threshold Q</th>
             <th class="text-end">Revenue {{ q_label }}</th>
             <th style="min-width:120px">Attainment Q</th>
             <th class="text-end">Rebate {{ q_label }}</th>
             <th class="text-end">Revenue {{ yr_label }}</th>
             <th class="text-end">Rebate {{ yr_label }}</th>
+            {% endif %}
           </tr>
         </thead>
         <tbody>
@@ -126,6 +174,34 @@
               {% else %}<span class="text-muted">—</span>{% endif %}
             </td>
             <td class="fw-semibold">{{ r.pct_display }}</td>
+
+            {% if yearly_mode %}
+            <td class="text-end">${{ r.thr_yr|floatformat:0|intcomma }}</td>
+            <td class="text-end">${{ r.yr_rev|floatformat:0|intcomma }}</td>
+            <td>
+              {% if r.has_pos %}
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:8px">
+                  <div class="progress-bar {% if r.yr_earned %}bg-success{% elif r.yr_attain >= 75 %}bg-warning{% else %}bg-danger{% endif %}"
+                    style="width:{{ r.yr_attain|floatformat:0 }}%; max-width:100%"></div>
+                </div>
+                <small class="{% if r.yr_earned %}text-success fw-semibold{% else %}text-muted{% endif %}" style="min-width:42px">
+                  {{ r.yr_attain }}%
+                </small>
+              </div>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if r.yr_earned %}
+              <span class="fw-semibold text-success">${{ r.yr_rebate|floatformat:0|intcomma }}</span>
+              {% else %}
+              <span class="text-muted">$0</span>
+              {% endif %}
+            </td>
+
+            {% else %}
             <td class="text-end">${{ r.thr_q|floatformat:0|intcomma }}</td>
             <td class="text-end">${{ r.q_rev|floatformat:0|intcomma }}</td>
             <td>
@@ -150,14 +226,12 @@
               <span class="text-muted">$0</span>
               {% endif %}
             </td>
-            <td class="text-end">${{ r.yr_rev|floatformat:0|intcomma }}</td>
-            <td class="text-end">
-              {% if r.yr_earned %}
-              <span class="fw-semibold text-success">${{ r.yr_rebate|floatformat:0|intcomma }}</span>
-              {% else %}
-              <span class="text-muted">$0</span>
-              {% endif %}
+            <td class="text-end text-muted">${{ r.yr_rev|floatformat:0|intcomma }}</td>
+            <td class="text-end text-muted">
+              {% if r.yr_earned %}<span class="text-success">${{ r.yr_rebate|floatformat:0|intcomma }}</span>{% else %}$0{% endif %}
             </td>
+            {% endif %}
+
           </tr>
           {% empty %}
           <tr>
