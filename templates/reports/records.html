@@ -193,27 +193,36 @@
                    data-rep1-name="{{ r.salesperson_override.agent_name|default:'' }}"
                    data-rep2-name="{{ r.salesperson_override_2.agent_name|default:'' }}"
                    data-split-pct="{{ r.salesperson_split_pct }}">
-                <!-- Rep 1 autocomplete -->
-                <input type="text" class="form-control form-control-sm mt-1 rep-input-1"
-                       list="sp-list" placeholder="Type rep name or clear…"
-                       autocomplete="off" style="font-size:.8rem; min-width:170px">
-                <!-- Split toggle -->
+                <!-- No-split: single unlabeled input -->
+                <div class="no-split-row mt-1">
+                  <input type="text" class="form-control form-control-sm rep-input-1"
+                         list="sp-list" placeholder="Type rep name or clear…"
+                         autocomplete="off" style="font-size:.8rem; min-width:180px">
+                </div>
+                <!-- Split: two labeled rows (hidden until toggled) -->
+                <div class="split-section d-none mt-1">
+                  <div class="d-flex align-items-center gap-1 mb-1">
+                    <span class="small fw-semibold text-nowrap" style="width:38px">Rep 1</span>
+                    <input type="text" class="form-control form-control-sm rep-input-1-split"
+                           list="sp-list" placeholder="Type rep 1 name…"
+                           autocomplete="off" style="font-size:.8rem; flex:1; min-width:0">
+                    <input type="number" class="form-control form-control-sm split-pct-input"
+                           min="1" max="99" value="50" style="width:50px; font-size:.8rem; flex-shrink:0">
+                    <span class="small text-muted" style="flex-shrink:0">%</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="small fw-semibold text-nowrap" style="width:38px">Rep 2</span>
+                    <input type="text" class="form-control form-control-sm rep-input-2"
+                           list="sp-list" placeholder="Type rep 2 name…"
+                           autocomplete="off" style="font-size:.8rem; flex:1; min-width:0">
+                    <span class="small text-muted split-pct-2-label" style="width:32px; flex-shrink:0; text-align:right">50%</span>
+                  </div>
+                </div>
+                <!-- Toggle link -->
                 <div class="mt-1">
                   <a href="#" class="split-toggle text-muted small text-decoration-none">
                     <i class="bi bi-plus-circle me-1 split-icon"></i><span class="split-toggle-label">Split between 2 reps</span>
                   </a>
-                </div>
-                <!-- Split section -->
-                <div class="split-section d-none mt-1 p-2 rounded" style="background:var(--bg-elevated);border:1px solid var(--border-color)">
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <label class="small text-muted mb-0" style="width:52px;flex-shrink:0">Rep 1 %</label>
-                    <input type="number" class="form-control form-control-sm split-pct-input"
-                           min="1" max="99" value="50" style="width:64px; font-size:.8rem">
-                    <span class="small text-muted split-pct-2-label">Rep 2: 50%</span>
-                  </div>
-                  <input type="text" class="form-control form-control-sm rep-input-2"
-                         list="sp-list" placeholder="Type rep 2 name…"
-                         autocomplete="off" style="font-size:.8rem; min-width:170px">
                 </div>
                 <div class="d-flex gap-1 mt-1">
                   <button class="btn btn-kramer btn-sm rep-save-btn" data-record="{{ r.pk }}" style="font-size:.75rem;padding:2px 8px">Save</button>
@@ -349,37 +358,48 @@ function closeAllEditors() {
   document.querySelectorAll('.rep-edit-btn').forEach(b => b.classList.remove('d-none'));
 }
 
+function setSplitMode(editor, open) {
+  const noSplitRow  = editor.querySelector('.no-split-row');
+  const splitSection = editor.querySelector('.split-section');
+  const toggleLabel  = editor.querySelector('.split-toggle-label');
+  const toggleIcon   = editor.querySelector('.split-icon');
+  const input1       = editor.querySelector('.rep-input-1');
+  const input1Split  = editor.querySelector('.rep-input-1-split');
+
+  if (open) {
+    // Transfer whatever is in the single input → Rep 1 split input
+    input1Split.value = input1.value;
+    noSplitRow.classList.add('d-none');
+    splitSection.classList.remove('d-none');
+    toggleLabel.textContent = 'Remove split';
+    toggleIcon.className = 'bi bi-dash-circle me-1 split-icon';
+    input1Split.focus();
+  } else {
+    // Transfer Rep 1 split input back → single input
+    input1.value = input1Split.value;
+    splitSection.classList.add('d-none');
+    noSplitRow.classList.remove('d-none');
+    toggleLabel.textContent = 'Split between 2 reps';
+    toggleIcon.className = 'bi bi-plus-circle me-1 split-icon';
+    input1.focus();
+  }
+}
+
 function initEditor(editor) {
   const rep1Name = editor.dataset.rep1Name || '';
   const rep2Name = editor.dataset.rep2Name || '';
   const splitPct = parseInt(editor.dataset.splitPct) || 100;
+  const hasSplit = rep2Name && splitPct < 100;
 
-  const input1 = editor.querySelector('.rep-input-1');
-  const input2 = editor.querySelector('.rep-input-2');
-  const pctInput = editor.querySelector('.split-pct-input');
-  const pctLabel = editor.querySelector('.split-pct-2-label');
-  const splitSection = editor.querySelector('.split-section');
-  const toggleLabel = editor.querySelector('.split-toggle-label');
-  const toggleIcon = editor.querySelector('.split-icon');
+  // Reset all fields
+  editor.querySelector('.rep-input-1').value = rep1Name;
+  editor.querySelector('.rep-input-1-split').value = rep1Name;
+  editor.querySelector('.rep-input-2').value = rep2Name;
+  editor.querySelector('.split-pct-input').value = hasSplit ? splitPct : 50;
+  editor.querySelector('.split-pct-2-label').textContent = hasSplit ? (100 - splitPct) + '%' : '50%';
 
-  input1.value = rep1Name;
-
-  if (rep2Name && splitPct < 100) {
-    splitSection.classList.remove('d-none');
-    input2.value = rep2Name;
-    pctInput.value = splitPct;
-    pctLabel.textContent = 'Rep 2: ' + (100 - splitPct) + '%';
-    toggleLabel.textContent = 'Remove split';
-    toggleIcon.className = 'bi bi-dash-circle me-1 split-icon';
-  } else {
-    splitSection.classList.add('d-none');
-    input2.value = '';
-    pctInput.value = 50;
-    pctLabel.textContent = 'Rep 2: 50%';
-    toggleLabel.textContent = 'Split between 2 reps';
-    toggleIcon.className = 'bi bi-plus-circle me-1 split-icon';
-  }
-  input1.focus();
+  setSplitMode(editor, hasSplit);
+  if (!hasSplit) editor.querySelector('.rep-input-1').focus();
 }
 
 document.querySelectorAll('.rep-edit-btn').forEach(btn => {
@@ -399,27 +419,15 @@ document.querySelectorAll('.split-toggle').forEach(link => {
     e.preventDefault();
     e.stopPropagation();
     const editor = link.closest('.rep-editor');
-    const splitSection = editor.querySelector('.split-section');
-    const toggleLabel = editor.querySelector('.split-toggle-label');
-    const toggleIcon = editor.querySelector('.split-icon');
-    const isOpen = !splitSection.classList.contains('d-none');
-    if (isOpen) {
-      splitSection.classList.add('d-none');
-      toggleLabel.textContent = 'Split between 2 reps';
-      toggleIcon.className = 'bi bi-plus-circle me-1 split-icon';
-    } else {
-      splitSection.classList.remove('d-none');
-      toggleLabel.textContent = 'Remove split';
-      toggleIcon.className = 'bi bi-dash-circle me-1 split-icon';
-      editor.querySelector('.rep-input-2').focus();
-    }
+    const isOpen = !editor.querySelector('.split-section').classList.contains('d-none');
+    setSplitMode(editor, !isOpen);
   });
 });
 
 document.querySelectorAll('.split-pct-input').forEach(input => {
   input.addEventListener('input', () => {
     const val = Math.max(1, Math.min(99, parseInt(input.value) || 50));
-    input.closest('.split-section').querySelector('.split-pct-2-label').textContent = 'Rep 2: ' + (100 - val) + '%';
+    input.closest('.split-section').querySelector('.split-pct-2-label').textContent = (100 - val) + '%';
   });
 });
 
@@ -438,9 +446,9 @@ document.querySelectorAll('.rep-save-btn').forEach(btn => {
     e.stopPropagation();
     const rid = btn.dataset.record;
     const editor = document.getElementById('rep-editor-' + rid);
-    const input1 = editor.querySelector('.rep-input-1');
     const splitSection = editor.querySelector('.split-section');
     const hasSplit = !splitSection.classList.contains('d-none');
+    const input1 = hasSplit ? editor.querySelector('.rep-input-1-split') : editor.querySelector('.rep-input-1');
     const input2 = editor.querySelector('.rep-input-2');
     const pctInput = editor.querySelector('.split-pct-input');
 
