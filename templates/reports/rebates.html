@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block ai_context %}VIR Rebates page — {% if yearly_mode %}Full Year {{ year }}{% else %}Q{{ quarter }} {{ year }}{% endif %}. Shows {{ total_agreements }} active rebate agreements, attainment vs threshold, and earned rebate amounts.{% endblock %}
+{% block ai_context %}VIR Rebates page — {% if yearly_mode %}Full Year {{ year }}{% else %}Q{{ quarter }} {{ year }}{% endif %}. Shows {{ total_agreements }} active rebate agreements. When the user says "distributors on this screen" or "in this view", they mean these specific rebate distributors: {{ rebate_dist_info }}.{% endblock %}
 
 {% block content %}
 

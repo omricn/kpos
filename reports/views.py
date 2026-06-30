@@ -2125,6 +2125,7 @@ Today: {today_str}. All revenue is in USD.
 - ALWAYS call a tool for any data question. Never rely on a prior answer — always re-query for fresh results.
 - For follow-up questions ("top 3", "same but for EMEA", "what about February?"), carry the filters from context into the tool call.
 - If a user says "this year" use {today_str[:4]}; "last month" use the prior calendar month; "this month" use the current month.
+- When the user says "distributors on this screen", "in this view", "listed here", or similar — use the distributor names and codes from the Current screen section above to scope your tool calls. Do not query all distributors.
 - Keep replies short and direct — 2–4 sentences unless the user asks for detail. Lead with the answer, not preamble.
 - Format numbers: $1,234,567 for revenue, 1,234 for units. Bold key figures if markdown helps.
 - If the tool returns no data, say so plainly: "No records found for [filter]." Don't speculate about why.
@@ -2332,20 +2333,27 @@ def rebates_view(request):
 
     q_label = f"Q{quarter} {year}" if not yearly_mode else str(year)
 
+    # Build a distributor list string for the AI context block
+    rebate_dist_info = ', '.join(
+        f"{r['agreement'].customer_name} (code: {r['agreement'].distributor.code})"
+        for r in results if r['agreement'].distributor_id
+    ) or 'none linked to POS data'
+
     return render(request, 'reports/rebates.html', {
-        'results':          results,
-        'year':             year,
-        'quarter':          quarter,
-        'yearly_mode':      yearly_mode,
-        'q_label':          q_label,
-        'yr_label':         str(year),
-        'total_q_rebate':   total_q_rebate,
-        'total_yr_rebate':  total_yr_rebate,
-        'earned_count':     earned_count,
-        'total_agreements': len(results),
-        'available_years':  available_years,
-        'selected_region':  region,
-        'page_title':       'VIR Rebates',
+        'results':           results,
+        'year':              year,
+        'quarter':           quarter,
+        'yearly_mode':       yearly_mode,
+        'q_label':           q_label,
+        'yr_label':          str(year),
+        'total_q_rebate':    total_q_rebate,
+        'total_yr_rebate':   total_yr_rebate,
+        'earned_count':      earned_count,
+        'total_agreements':  len(results),
+        'available_years':   available_years,
+        'selected_region':   region,
+        'rebate_dist_info':  rebate_dist_info,
+        'page_title':        'VIR Rebates',
     })
 
 
