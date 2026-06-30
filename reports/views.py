@@ -2101,6 +2101,7 @@ def ai_chat(request):
     if not api_key:
         return JsonResponse({'reply': 'AI assistant is not configured yet.', 'wants_export': False})
 
+    page_context = (body.get('page_context') or '').strip()
     data_context = _build_ai_context()
     today_str = date_cls.today().strftime('%B %d, %Y')
 
@@ -2112,6 +2113,9 @@ Kramer distributors submit weekly/monthly Point-of-Sale reports. Each record = o
 - "Product" = identified by manufacturer part number + product description.
 - "Revenue" = invoiced value converted to USD using monthly exchange rates.
 - Not every distributor reports every field (e.g., some don't have sales rep data).
+
+## Current screen
+{page_context if page_context else 'Unknown screen'}
 
 ## Data available
 {data_context}

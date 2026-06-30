@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block ai_context %}Revenue Trend — Year: {{ year }}, Region: {{ selected_region|default:"All regions" }}. Shows monthly revenue and units over time.{% endblock %}
+
 {% block content %}
 
 <!-- Header -->

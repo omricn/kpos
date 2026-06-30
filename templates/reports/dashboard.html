@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block ai_context %}Dashboard — Year: {{ year }}, Region: {{ selected_region|default:"All regions" }}. Shows overall revenue, top distributors by revenue, and product/customer breakdown for the selected period.{% endblock %}
+
 {% block content %}
 
 <!-- Page header -->

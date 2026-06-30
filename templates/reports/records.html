@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block ai_context %}Distributor records — {{ distributor.name }} (code: {{ distributor.code }}, region: {{ distributor.region }}). Viewing individual invoice line items for this distributor.{% endblock %}
+
 {% block content %}
 <!-- Header -->
 <div class="d-flex align-items-center justify-content-between mb-3">

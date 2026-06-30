@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block ai_context %}Product Detail — {{ product.manufacturer_part_no|default:product.product_name }}. Shows all invoices and revenue breakdown for a single Kramer product SKU.{% endblock %}
+
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
 {% endblock %}

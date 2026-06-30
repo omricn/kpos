@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load humanize %}
 
+{% block ai_context %}VIR Rebates page — {% if yearly_mode %}Full Year {{ year }}{% else %}Q{{ quarter }} {{ year }}{% endif %}. Shows {{ total_agreements }} active rebate agreements, attainment vs threshold, and earned rebate amounts.{% endblock %}
+
 {% block content %}
 
 <!-- Header -->

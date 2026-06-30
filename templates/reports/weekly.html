@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block ai_context %}Weekly Sales view — Region: {{ selected_region|default:"All regions" }}. Shows POS revenue broken down by week.{% endblock %}
+
 {% block content %}
 
 <!-- Header -->

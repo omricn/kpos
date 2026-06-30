@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block ai_context %}Products / Sales by Product — Year: {{ year }}, Region: {{ selected_region|default:"All regions" }}. Shows revenue and units sold per Kramer product SKU.{% endblock %}
+
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
 {% endblock %}

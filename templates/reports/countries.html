@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block ai_context %}Sales by Country — Year: {{ year }}, Region: {{ selected_region|default:"All regions" }}. Shows revenue and units broken down by end-customer country.{% endblock %}
+
 {% block content %}
 
 <!-- Header -->

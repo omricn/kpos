@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
+{% block ai_context %}Distributors list — Region: {{ selected_region|default:"All regions" }}. Shows all distributors with their POS upload status and revenue summary.{% endblock %}
+
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
 {% endblock %}
