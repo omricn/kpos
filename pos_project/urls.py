@@ -8,6 +8,6 @@ urlpatterns = [
     path('demo-login/', DemoLoginView.as_view(), name='demo-login'),
 
     path('admin/', admin.site.urls),
-    path('oauth2/', include('django_auth_adfs.urls')),
+    *([path('oauth2/', include('django_auth_adfs.urls'))] if __import__('os').environ.get('ADFS_TENANT_ID') else []),
     path('', include('reports.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
