@@ -22,7 +22,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'pos_project.middleware.ForceHttpsMiddleware',
+    # 'pos_project.middleware.ForceHttpsMiddleware',  # disabled in demo/local mode
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -31,7 +31,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_auth_adfs.middleware.LoginRequiredMiddleware',
+    # 'django_auth_adfs.middleware.LoginRequiredMiddleware',  # disabled in demo mode
 ]
 
 ROOT_URLCONF = 'pos_project.urls'
@@ -119,3 +119,9 @@ if os.environ.get('ADFS_TENANT_ID'):
     LOGIN_REDIRECT_URL = '/'
 
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY', '')
+
+# -- Demo mode (portfolio) -----------------------------------------------------
+# When ADFS_TENANT_ID is absent, use a simple auto-login view instead.
+# SQLite is already the default when DB_HOST is not set (see DATABASES above).
+if not __import__('os').environ.get('ADFS_TENANT_ID'):
+    LOGIN_URL = '/demo-login/'
