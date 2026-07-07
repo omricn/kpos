@@ -30,7 +30,7 @@ A sales analytics platform for tracking global distributor sell-through data. Bu
 - Classification tiers: Platinum, Standard, Dealer, Special Program
 - Quarterly and YTD rebate totals, earned vs. missed
 
-![VIR Rebates](screenshots/rebates.png)
+![VIR Rebates](screenshots/Rebates.png)
 
 **AI assistant**
 - Floating chat panel powered by Claude API
